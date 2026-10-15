@@ -1,0 +1,56 @@
+# End to end: the real app on the local stack (embedded Postgres with every migration and demo data, real PostgREST),
+# signed in through a real browser, every screen at 1440, 1280, 1024 and 390 px wide. Fails on anything cut off,
+# spilling out, sideways scrolling or a page error. Called by CI and nightly; can be run by hand.
+name: E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: npm ci
+      - name: Build the app for the local stack
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://localhost:54321
+          VITE_SUPABASE_ANON_KEY: demo
+      - name: Local stack dependencies and PostgREST
+        working-directory: tests/local-stack
+        run: |
+          npm init -y >/dev/null
+          npm i --silent @electric-sql/pglite @electric-sql/pglite-socket jsonwebtoken
+          curl -sSL -o pgrst.tar.xz https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz
+          tar xf pgrst.tar.xz
+      - name: Start the stack
+        working-directory: tests/local-stack
+        run: |
+          nohup node server.mjs > server.log 2>&1 &
+          for i in $(seq 1 90); do grep -q "ready on" server.log && break; sleep 2; done
+          grep -q "ready on" server.log || (cat server.log; exit 1)
+      - name: Browser
+        run: |
+          pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+      - name: Layout audit at four widths
+        run: |
+          python tests/local-stack/layout-audit.py | tee audit.txt
+          grep -q "PAGES WITH ISSUES: 0" audit.txt
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            tests/local-stack/server.log
+            audit.txt
+          retention-days: 7

@@ -1,0 +1,53 @@
+{
+  "name": "bmg-pms",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:db": "node tests/scenario.test.mjs",
+    "test:mw": "node tests/middleware.test.mjs",
+    "test": "node tests/scenario.test.mjs && node tests/middleware.test.mjs && node tests/platform.test.mjs && node tests/payments.test.mjs && node tests/stock_assets.test.mjs && node tests/control_panel.test.mjs && node tests/security.test.mjs && node tests/activities.test.mjs && node tests/operations.test.mjs && node tests/permissions.test.mjs && npm run test:privileges && npm run test:review && npm run test:nightmode && npm run test:billing && npm run test:isolation && npm run test:pos && npm run test:procurement && npm run test:quickbooks && npm run test:packages && npm run test:relay && npm run test:audit",
+    "test:platform": "node tests/platform.test.mjs",
+    "test:payments": "node tests/payments.test.mjs",
+    "test:stock": "node tests/stock_assets.test.mjs",
+    "test:admin": "node tests/control_panel.test.mjs",
+    "test:security": "node tests/security.test.mjs",
+    "test:activities": "node tests/activities.test.mjs",
+    "test:operations": "node tests/operations.test.mjs",
+    "test:permissions": "node tests/permissions.test.mjs",
+    "test:privileges": "node tests/privileges.test.mjs",
+    "test:review": "node tests/review.test.mjs",
+    "test:nightmode": "node tests/nightmode.test.mjs",
+    "test:billing": "node tests/billing.test.mjs",
+    "lint": "eslint .",
+    "test:isolation": "node tests/isolation.test.mjs",
+    "db:check": "node scripts/db-modules.mjs check",
+    "db:lock": "node scripts/db-modules.mjs lock",
+    "db:headers": "node scripts/db-modules.mjs headers",
+    "test:pos": "node tests/pos.test.mjs",
+    "test:procurement": "node tests/procurement.test.mjs",
+    "test:quickbooks": "node tests/quickbooks.test.mjs",
+    "test:packages": "node tests/packages.test.mjs",
+    "test:relay": "node tests/hikvision-relay.test.mjs",
+    "test:audit": "node tests/audit.test.mjs"
+  },
+  "dependencies": {
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "vite": "^7.3.6"
+  }
+}

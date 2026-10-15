@@ -1,0 +1,14 @@
+# Who must approve changes to each part. Replace @bmg-it with your GitHub team or usernames
+# (e.g. @balati). With branch protection "Require review from Code Owners", a change to a module's
+# database lock file needs that module's owner, so one area cannot be changed by accident from another.
+*                                   @bmg-it
+
+# Pipeline, security and money: always a second pair of eyes
+/.github/                           @bmg-it
+/scripts/                           @bmg-it
+/supabase/migrations/               @bmg-it
+/supabase/schema/access.lock.json   @bmg-it
+/supabase/schema/platform.lock.json @bmg-it
+/supabase/schema/billing.lock.json  @bmg-it
+/supabase/schema/cashiering.lock.json @bmg-it
+/supabase/functions/                @bmg-it

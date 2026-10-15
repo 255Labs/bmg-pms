@@ -1,0 +1,7 @@
+# Secret scan settings. Test fixtures and the local demo stack use made-up keys on purpose.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures and demo-only values"
+paths = ['''tests/''', '''supabase/schema/''', '''package-lock\.json''']

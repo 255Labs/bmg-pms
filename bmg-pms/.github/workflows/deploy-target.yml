@@ -1,0 +1,96 @@
+# One deployment target (a GitHub Environment): its Supabase project and its Netlify site.
+# Order: check the database is reachable → migrations in one transaction → isolation report must be empty →
+# Edge Functions → build the app with this target's public keys → publish to Netlify → smoke test.
+#
+# Environment secrets:   SUPABASE_DB_URL, SUPABASE_ACCESS_TOKEN, NETLIFY_AUTH_TOKEN
+# Environment variables: SUPABASE_PROJECT_REF, SUPABASE_URL, SUPABASE_ANON_KEY (public), NETLIFY_SITE_ID, APP_URL
+name: Deploy target
+on:
+  workflow_call:
+    inputs:
+      environment: { type: string, required: true }
+      sha: { type: string, required: true }
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ inputs.sha }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - run: npm ci
+
+      - name: Settings present
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          missing=""
+          for v in SUPABASE_DB_URL SUPABASE_ACCESS_TOKEN NETLIFY_AUTH_TOKEN SUPABASE_PROJECT_REF SUPABASE_URL SUPABASE_ANON_KEY NETLIFY_SITE_ID APP_URL; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then echo "::error::Environment ${{ inputs.environment }} is missing:$missing"; exit 1; fi
+      - name: Database reachable
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtc "select 1" > /dev/null
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: "Migrations (one transaction: all or nothing)"
+        run: bash scripts/db-push.sh
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: Property isolation report must be empty
+        run: |
+          n=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtAc "select count(*) from pms__isolation_problems()")
+          if [ "$n" != "0" ]; then psql "$DATABASE_URL" -c "select * from pms__isolation_problems()"; exit 1; fi
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: Edge Functions
+        run: bash scripts/deploy-functions.sh
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+
+      - name: Build the app for this target
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+
+      - name: Publish to Netlify
+        run: npx --yes netlify-cli@17 deploy --prod --dir dist --site "$NETLIFY_SITE_ID" --message "${{ inputs.sha }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+
+      - name: Smoke test
+        run: |
+          code=$(curl -s -o page.html -w '%{http_code}' "$APP_URL")
+          [ "$code" = "200" ] && grep -qi "BMG PMS" page.html || { echo "::error::$APP_URL answered $code"; exit 1; }
+          api=$(curl -s -o /dev/null -w '%{http_code}' "$SUPABASE_URL/rest/v1/" -H "apikey: $SUPABASE_ANON_KEY")
+          case "$api" in 200|401) ;; *) echo "::error::Supabase API answered $api"; exit 1;; esac
+          echo "✓ ${{ inputs.environment }}: $APP_URL is up on ${{ inputs.sha }}" >> $GITHUB_STEP_SUMMARY
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}

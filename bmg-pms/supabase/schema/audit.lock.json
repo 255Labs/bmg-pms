@@ -1,0 +1,17 @@
+{
+ "function pms__audit_cfg(p_property uuid)": "1bdc549b55c0",
+ "function pms__audit_day(p_property uuid, p_day date)": "3da07672a1a1",
+ "function pms__audit_run_all()": "e2b862eacef6",
+ "function pms__camera_zone(p_property uuid, p_device text, p_channel text)": "64f0730e39e4",
+ "function pms__staff_near(p_property uuid, p_room uuid, p_at timestamp with time zone, p_staff text[], p_window interval)": "2e731e214d85",
+ "function pms__stay_money(p_stay uuid)": "24f422abb624",
+ "function pms_audit_resolve(p_finding uuid, p_status text, p_note text)": "5552dc04be99",
+ "function pms_audit_run(p_property uuid, p_from date, p_to date)": "f06ece6b3189",
+ "function pms_audit_settings(p_property uuid, p jsonb)": "3a8e32795508",
+ "function pms_audit_timeline(p_property uuid, p_room uuid, p_day date)": "f30c2a2cca3a",
+ "function pms_rpt_audit_daily(p_property uuid, p_from date, p_to date)": "37c2db66d9a2",
+ "function pms_rpt_audit_summary(p_property uuid, p_from date, p_to date)": "31f3bb84c350",
+ "function pms_trg_camera_zone_tidy()": "91cf59e73e68",
+ "table pms_audit_findings": "6a41eb2869d3",
+ "table pms_camera_zones": "84c3b73cea21"
+}

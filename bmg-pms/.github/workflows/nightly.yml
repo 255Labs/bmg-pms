@@ -1,0 +1,14 @@
+# Every night at 02:00 Dar es Salaam: the full CI on main (all suites, lint, module check, audit) plus the browser
+# check, so a dependency or outside change that breaks something shows up before the morning shift.
+name: Nightly
+on:
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml   # includes the browser check, since this runs on main

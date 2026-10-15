@@ -1,0 +1,18 @@
+node_modules
+dist
+.env
+tests/local-stack/node_modules
+tests/local-stack/package*.json
+tests/local-stack/postgrest
+tests/local-stack/pgrst.tar.xz
+tests/local-stack/server.log
+audit.txt
+.env.*
+!.env.example
+*.local
+supabase/secrets.env
+supabase/.env
+
+# Hikvision relay: settings with a camera password, and its offline queue
+tools/hikvision-relay/relay.env
+relay-queue.json

@@ -1,0 +1,83 @@
+# CI: every push and pull request.
+#   checks  → lint, database module boundaries and lock files, dependency audit, secret scan, production build
+#   tests   → all 15 suites in parallel on an embedded Postgres
+#   e2e     → the whole app on the local stack (real PostgREST) in a browser at 4 screen widths; only when screens changed
+# Deploys are in deploy.yml and start only after this workflow is green on main.
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Database modules (boundaries, re-run safety, property isolation, lock files)
+        run: npm run db:check
+      - name: Dependencies with known high-severity problems
+        run: npm audit --omit=dev --audit-level=high
+      - name: No keys or passwords committed
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 detect --source=/repo --redact --no-banner
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: build-check
+      - name: Which modules does this change touch?
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD -- supabase/schema supabase/migrations \
+            | sed -E 's#supabase/schema/(.*)\.lock\.json#module: \1#' | sort -u > touched.txt || true
+          echo "### Database changes in this pull request" >> $GITHUB_STEP_SUMMARY
+          if [ -s touched.txt ]; then sed 's/^/- /' touched.txt >> $GITHUB_STEP_SUMMARY; else echo "None" >> $GITHUB_STEP_SUMMARY; fi
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [db, mw, platform, payments, stock, admin, security, activities, operations, permissions, privileges, review, nightmode, billing, isolation, pos, procurement, quickbooks, packages, relay, audit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:${{ matrix.suite }}
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      screens: ${{ steps.f.outputs.screens }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: f
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            screens:
+              - 'src/**'
+              - 'supabase/migrations/**'
+              - 'tests/local-stack/**'
+
+  e2e:
+    needs: [changes]
+    if: needs.changes.outputs.screens == 'true' || github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/e2e.yml

@@ -1,0 +1,138 @@
+{
+  "_about": "Each database object belongs to the module whose migration created it. A migration declares its module on its first line (-- module: <name>) and lists any other module it changes (-- also: a, b). `npm run db:check` refuses a migration that changes another module's tables or functions without saying so, so one area can change without silently breaking another. Owners per module are in .github/CODEOWNERS.",
+  "modules": {
+    "core": {
+      "about": "Properties, rooms, room types, guests, reservations, stays, folios: the shared base every module builds on",
+      "tests": [
+        "test:db",
+        "test:review"
+      ]
+    },
+    "access": {
+      "about": "Row security, roles, custom roles, privileges, who may do what",
+      "tests": [
+        "test:permissions",
+        "test:privileges",
+        "test:security"
+      ]
+    },
+    "front-office": {
+      "about": "Booking, check-in and out, room moves, amendments and their charge previews",
+      "tests": [
+        "test:db",
+        "test:review"
+      ]
+    },
+    "night-audit": {
+      "about": "End of day: room charges, no-shows, statistics, business date",
+      "tests": [
+        "test:db"
+      ]
+    },
+    "reports": {
+      "about": "Every report and the group overview",
+      "tests": [
+        "test:db",
+        "test:operations"
+      ]
+    },
+    "cashiering": {
+      "about": "Folio tools, payments, drawers, city ledger, vouchers",
+      "tests": [
+        "test:db",
+        "test:operations"
+      ]
+    },
+    "back-office": {
+      "about": "POS, travel agents, exchange rates, packages and promotions",
+      "tests": [
+        "test:db",
+        "test:operations"
+      ]
+    },
+    "integrations": {
+      "about": "Channex, TTLock, Hikvision, fiscal receipts, Tenda ICO, eZee import, job queue",
+      "tests": [
+        "test:mw",
+        "test:platform"
+      ]
+    },
+    "payments": {
+      "about": "Guest mobile money (ClickPesa) and SMS (Beem)",
+      "tests": [
+        "test:payments"
+      ]
+    },
+    "stock": {
+      "about": "Kitchen and bar stock, recipes, room assets",
+      "tests": [
+        "test:stock"
+      ]
+    },
+    "platform": {
+      "about": "Control panel, platform administrators, security hardening, property and user isolation",
+      "tests": [
+        "test:admin",
+        "test:security",
+        "test:isolation"
+      ]
+    },
+    "activities": {
+      "about": "Gym, pool, games, spa, tours: timers, memberships, door check-ins",
+      "tests": [
+        "test:activities"
+      ]
+    },
+    "operations": {
+      "about": "Setup lists, rate calendar, booking page, folio extras, POS for in-house guests",
+      "tests": [
+        "test:operations"
+      ]
+    },
+    "billing": {
+      "about": "BMG monthly subscriptions: invoices, locks, ClickPesa collection",
+      "tests": [
+        "test:billing"
+      ]
+    },
+    "pos": {
+      "about": "Full-service POS: menus, modifiers, tables, kitchen display, happy hours, split tender, end-of-day",
+      "tests": [
+        "test:pos"
+      ]
+    },
+    "procurement": {
+      "about": "Suppliers, store requests and issues, purchase orders, goods received, supplier invoices and payments",
+      "tests": [
+        "test:procurement"
+      ]
+    },
+    "accounting": {
+      "about": "QuickBooks Online: connection, account mapping, sync of vendors, bills, payments and daily revenue",
+      "tests": [
+        "test:quickbooks"
+      ]
+    },
+    "audit": {
+      "about": "Occupancy audit: camera sightings and door openings against check-ins, check-outs and payments; findings and their reports",
+      "tests": [
+        "test:audit"
+      ]
+    }
+  },
+  "platformManaged": {
+    "_about": "Added to every table by the platform module; not counted as a change to the table's own module",
+    "columns": [
+      "created_at",
+      "created_by",
+      "updated_at",
+      "updated_by"
+    ],
+    "triggers": [
+      "zz_stamp",
+      "trg_fixed_property",
+      "trg_same_property",
+      "trg_inherit_property"
+    ]
+  }
+}

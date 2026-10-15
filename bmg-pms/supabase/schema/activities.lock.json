@@ -1,0 +1,14 @@
+{
+ "function pms__pos_bill_close()": "fc8e2f3bc109",
+ "function pms__pos_item(p_bill pms_pos_bills, p_item uuid)": "f703789ec83a",
+ "function pms__pos_line_rules()": "f08019f1302e",
+ "function pms_activity_check_in(p_outlet uuid, p_membership uuid, p_stay uuid, p_name text, p_note text)": "9ff92542680e",
+ "function pms_cancel_membership(p_membership uuid, p_reason text)": "e66c5adf2921",
+ "function pms_pos_add_membership(p_bill uuid, p_item uuid, p_name text, p_phone text)": "953dbf44e46b",
+ "function pms_pos_running(p_property uuid)": "670439a22746",
+ "function pms_pos_start_timer(p_bill uuid, p_item uuid, p_resource text)": "6ac678e52960",
+ "function pms_pos_stop_timer(p_bill_item uuid)": "222e45926858",
+ "function pms_rpt_activities(p_property uuid, p_from date, p_to date)": "9f3703d7d6c6",
+ "table pms_activity_visits": "3bbbdd32fe08",
+ "table pms_memberships": "b06e1ef420af"
+}

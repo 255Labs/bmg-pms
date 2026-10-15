@@ -1,0 +1,13 @@
+{
+ "function pms__guest_name(g pms_guests)": "64761643cb80",
+ "function pms_group_snapshot()": "d986df334471",
+ "function pms_rpt_ageing(p_property uuid)": "45c423ae6aa3",
+ "function pms_rpt_audit_trail(p_property uuid, p_from date, p_to date)": "c7e8c9f71189",
+ "function pms_rpt_cashier(p_property uuid, p_from date, p_to date)": "4fef374e5a4e",
+ "function pms_rpt_daily_revenue(p_property uuid, p_from date, p_to date)": "d3c0d8223a8d",
+ "function pms_rpt_house_status(p_property uuid)": "9bd13831fc38",
+ "function pms_rpt_occupancy(p_property uuid, p_from date, p_to date)": "2924e4f93f7a",
+ "function pms_rpt_payments(p_property uuid, p_from date, p_to date)": "627284788c85",
+ "function pms_rpt_stays(p_property uuid, p_kind text, p_from date, p_to date)": "03db829dae38",
+ "function pms_rpt_voids(p_property uuid, p_from date, p_to date)": "3e1fc8210862"
+}

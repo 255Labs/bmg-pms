@@ -1,0 +1,20 @@
+{
+ "function pms__door_code_text(p_code pms_stay_passcodes)": "8704c591a2bd",
+ "function pms__msisdn(p text)": "1b4cbbe97bdd",
+ "function pms__queue_sms(p_property uuid, p_stay uuid, p_kind text, p_phone text, p_body text)": "002b958d018f",
+ "function pms_can_manage_integrations(p_property uuid)": "a956a9f74be8",
+ "function pms_cancel_payment_request(p_request uuid)": "7d1e367a3c51",
+ "function pms_request_mobile_payment(p_folio uuid, p_phone text, p_amount numeric)": "901771212c42",
+ "function pms_send_door_code_sms(p_stay uuid, p_phone text)": "710cf72a044c",
+ "function pms_send_sms(p_property uuid, p_phone text, p_body text, p_stay uuid)": "4b09652acab0",
+ "function pms_svc_open_payment_requests()": "c07d4fb9763d",
+ "function pms_svc_payment_property(p_order_ref text)": "078991f67d57",
+ "function pms_svc_payment_request(p_request uuid)": "902aedc18a4b",
+ "function pms_svc_payment_result(p_order_ref text, p_status text, p_collected numeric, p_txn text, p_raw jsonb)": "7d8593d9bd05",
+ "function pms_svc_payment_sent(p_request uuid, p_ok boolean, p_provider_status text, p_txn text, p_error text)": "d09e1c83b572",
+ "function pms_svc_sms_result(p_sms uuid, p_ok boolean, p_ref text, p_error text)": "47e8c432303f",
+ "function pms_svc_sms(p_sms uuid)": "77911cfaa004",
+ "function pms_trg_door_code_sms()": "930855cda163",
+ "table pms_payment_requests": "c7a732899aeb",
+ "table pms_sms_out": "de4115295173"
+}

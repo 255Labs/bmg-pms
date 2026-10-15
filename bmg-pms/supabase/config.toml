@@ -1,0 +1,38 @@
+# Supabase CLI settings for the Edge Functions.
+# Webhooks from Channex and the camera relay cannot send a Supabase JWT; they are
+# protected by their own shared secrets instead (see README → Integrations).
+[functions.channex-webhook]
+verify_jwt = false
+
+[functions.hikvision-ingest]
+verify_jwt = false
+
+[functions.channex-sync]
+verify_jwt = false
+
+[functions.ttlock-sync]
+verify_jwt = false
+
+[functions.fiscal-sync]
+verify_jwt = false
+
+[functions.pos-gateway]
+verify_jwt = false
+
+[functions.payments-sync]
+verify_jwt = false
+
+[functions.clickpesa-webhook]
+verify_jwt = false
+
+[functions.sms-sync]
+verify_jwt = false
+
+# integration-catalog keeps the Supabase JWT check: only signed-in staff reach it
+
+[functions.quickbooks-sync]
+verify_jwt = false
+
+# QuickBooks sends the browser back here without a Supabase session; the one-time state proves who started it
+[functions.quickbooks-oauth]
+verify_jwt = false
