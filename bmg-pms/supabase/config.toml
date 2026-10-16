@@ -8,6 +8,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.channex-sync]
+entrypoint = "./functions/channex-sync/index.js"
 verify_jwt = false
 
 [functions.ttlock-sync]
