@@ -16,3 +16,5 @@ supabase/.env
 # Hikvision relay: settings with a camera password, and its offline queue
 tools/hikvision-relay/relay.env
 relay-queue.json
+
+supabase/.temp/
