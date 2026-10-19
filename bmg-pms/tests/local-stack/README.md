@@ -24,8 +24,14 @@ Subscriptions: Unreal Homes paid last month and has this month's invoice due in 
 Upanga Lodge is locked for an unpaid invoice: sign in as `owner@upanga.co.tz` / `demo1234` to see the lock screen and
 pay. `bbalati@` is a platform administrator (never locked out): Control panel → Billing shows every property.
 
+Guest portal: Lulu Kayanda (room 334) is signed in to her portal and has asked for towels and dinner. The server
+prints her link at start-up and writes it to `tests/local-stack/.portal-link`. Open it in another browser (or a
+private window): ask for a key with `lulu.kayanda@example.com`, or press **Key for the guest** on her reservation
+and choose "Reception gave me a key". Send a request from the portal and watch it pop up on the staff screen within
+ten seconds.
+
 **Layout check.** With the stack running, `pip install playwright` and run
 `python3 tests/local-stack/layout-audit.py` (optionally with widths, e.g. `1440 390`). It visits every screen, every
-Setup section, the reservation tabs, the payment and access dialogs and the booking page at 1440, 1280, 1024 and
+Setup section, the reservation tabs, the payment and access dialogs, the booking page and the guest portal at 1440, 1280, 1024 and
 390 px, and lists anything cut off, spilling out of its box or forcing the page to scroll sideways. It should print
 `PAGES WITH ISSUES: 0`.

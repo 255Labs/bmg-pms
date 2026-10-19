@@ -4,6 +4,7 @@ import { useProperty } from '../lib/property.jsx';
 import { useDesk } from '../lib/desk';
 import { can, fmtDateTime, label, money } from '../lib/format';
 import { Badge, Field, PageHead, Table, Tabs, useAction } from '../components/ui.jsx';
+import { GUEST_PAYMENTS } from '../lib/modules.js';
 
 const SERVICE = { channex: 'Channex', ttlock: 'TTLock', hikvision: 'Hikvision', fiscal: 'Fiscal receipts', tendaico: 'Tenda ICO', clickpesa: 'Mobile money', sms: 'SMS' };
 const TASK = {
@@ -42,14 +43,14 @@ export default function Integrations({ params }) {
     <>
       <PageHead title="Integrations" sub="Channel manager, door locks, cameras, fiscal receipts, Tenda ICO, mobile money and SMS. Passwords live in Supabase secrets, never on this screen." />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'channex', label: 'Channex' }, { value: 'ttlock', label: 'TTLock' },
-        { value: 'hikvision', label: 'Hikvision' }, { value: 'fiscal', label: 'Fiscal receipts' }, { value: 'tendaico', label: 'Tenda ICO' }, { value: 'clickpesa', label: 'Mobile money' }, { value: 'sms', label: 'SMS' }, { value: 'activity', label: 'Activity' }]} />
+        { value: 'hikvision', label: 'Hikvision' }, { value: 'fiscal', label: 'Fiscal receipts' }, { value: 'tendaico', label: 'Tenda ICO' }, ...(GUEST_PAYMENTS ? [{ value: 'clickpesa', label: 'Mobile money' }] : []), { value: 'sms', label: 'SMS' }, { value: 'activity', label: 'Activity' }]} />
       {tab === 'overview' && <Overview go={setTab} />}
       {tab === 'channex' && <Channex row={cfg('channex')} reload={load} />}
       {tab === 'ttlock' && <TTLock row={cfg('ttlock')} reload={load} />}
       {tab === 'hikvision' && <Hikvision row={cfg('hikvision')} reload={load} />}
       {tab === 'fiscal' && <Fiscal row={cfg('fiscal')} reload={load} />}
       {tab === 'tendaico' && <TendaIco />}
-      {tab === 'clickpesa' && <ClickPesa row={cfg('clickpesa')} reload={load} />}
+      {GUEST_PAYMENTS && tab === 'clickpesa' && <ClickPesa row={cfg('clickpesa')} reload={load} />}
       {tab === 'sms' && <Sms row={cfg('sms')} reload={load} />}
       {tab === 'activity' && <Activity />}
     </>

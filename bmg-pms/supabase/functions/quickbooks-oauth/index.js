@@ -6,17 +6,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { env, rpc } from '../_shared/deno.js';
 import { authorizeUrl, exchangeCode, listAccounts, companyName } from '../_shared/quickbooks.js';
+import { corsFor, parseOrigins } from '../_shared/util.js';
 
-const origins = (env.APP_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-const corsFor = (origin) => ({
-  'access-control-allow-origin': origins.length ? (origins.includes(origin) ? origin : origins[0]) : '*', vary: 'origin',
-  'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type', 'access-control-allow-methods': 'GET, POST, OPTIONS',
-});
+const origins = parseOrigins(env.APP_ORIGINS);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const appUrl = () => (origins[0] ?? '').replace(/\/$/, '');
 
 Deno.serve(async (req) => {
-  const cors = corsFor(req.headers.get('origin') ?? '');
+  const cors = corsFor(origins, req.headers.get('origin') ?? '', 'GET, POST, OPTIONS');
   const reply = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...cors } });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   const url = new URL(req.url);

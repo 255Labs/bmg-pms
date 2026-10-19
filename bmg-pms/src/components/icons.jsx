@@ -47,6 +47,8 @@ const P = {
   receipt: <><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
   phone: <><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M11 17h2" /></>,
   card: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18M7 15h3" /></>,
+  bell: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></>,
+  tray: <><path d="M4 15a8 8 0 0 1 16 0" /><path d="M2.5 15h19M12 7V5.5M10.5 5.5h3" /><path d="M4 18.5h16" /></>,
 };
 
 export default function Icon({ name, size = 18, className = '' }) {

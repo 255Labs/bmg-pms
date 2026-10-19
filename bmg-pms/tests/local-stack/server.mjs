@@ -2,7 +2,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
@@ -24,6 +24,8 @@ await db.exec(`
   grant execute on function auth.uid() to anon, authenticated;
 `);
 for (const f of readdirSync(join(APP, 'supabase/migrations')).sort()) await db.exec(readFileSync(join(APP, 'supabase/migrations', f), 'utf8'));
+// the demo history includes guest mobile-money payments made before that feature was switched off (migration 28)
+await db.exec(`update pms_catalog set active = true, default_on = true where key = 'clickpesa'`);
 await db.exec(`grant usage on schema public to anon;`);
 
 // Seed: owner + a property shaped like Unreal Homes with live data
@@ -311,10 +313,16 @@ await db.query(`update pms_stays set checked_in_at = (arrival + time '14:00') at
 await db.exec(`select set_config('test.uid','${OWNER}',false)`);
 await db.query(`select pms_audit_run($1,'2026-10-05','2026-10-12')`, [P]);
 
+// guest mobile money is off in the product for now, as in production after migration 28
+await db.exec(`update pms_catalog set active = false, default_on = false where key = 'clickpesa'; update pms_property_addons set enabled = false where key = 'clickpesa'; update pms_integrations set enabled = false where provider = 'clickpesa'`);
+
 // ---- configuration demo: lists, policies, booking engine, transport, a housekeeper
 await db.exec(`select set_config('test.uid','${OWNER}',false)`);
 await db.exec(`insert into auth.users(id,email,password) values ('44444444-4444-4444-4444-444444444444','housekeeping@bmggroup.co.tz','demo1234')`);
 await db.query(`select pms_set_member($1,'housekeeping@bmggroup.co.tz','housekeeping','Mama Upendo')`, [P]);
+await db.query(`select pms_save_custom_role($1,null,'Housekeeping Manager','housekeeping','Runs the housekeeping board: cleaned, not yet, maintenance, inspections',
+  (select array_agg(key) from pms_privilege_catalog where 'housekeeping' = any(default_roles) or key in ('hk.inspect','hk.maintenance','fo.requests')))`, [P]);
+await db.query(`select pms_set_member_access($1,(select id from auth.users where email='housekeeping@bmggroup.co.tz'),(select id from pms_custom_roles where property_id=$1 and name='Housekeeping Manager'),'{}'::jsonb)`, [P]);
 // custom roles: front desk without cancellations or the night audit; a revenue manager who only prices and reports
 const FOA_ROLE = await (async () => (await db.query(`select pms_save_custom_role($1,null,'Front Office Associate','front_desk','Desk staff on shift',
   (select array_agg(key) from pms_privilege_catalog where 'front_desk' = any(default_roles) and key not in ('res.cancel','fo.night_audit'))) id`, [P])).rows[0].id)();
@@ -367,6 +375,41 @@ await db.query(`select pms_save_rate_grid($1,$2::jsonb)`, [P, JSON.stringify([
   // the locked lodge has its own owner (not a platform administrator, who is never locked out)
   await db.exec(`insert into auth.users(id,email,password) values ('77777777-7777-7777-7777-777777777777','owner@upanga.co.tz','demo1234')`);
   await db.query(`select pms_set_member($1,'owner@upanga.co.tz','owner','Lodge owner')`, [L]);
+}
+// ---- guest portal demo: Lulu (room 334) has her link; she asked for towels and ordered dinner
+{
+  await db.exec(`select set_config('test.uid','${OWNER}',false)`);
+  await db.query(`insert into pms_property_addons(property_id,key,enabled) values ($1,'guest_portal',true) on conflict (property_id,key) do update set enabled=true`, [P]);
+  await db.query(`update pms_properties set settings = jsonb_set(settings, '{guest_portal}', '{"enabled":true,"auto_send":true,"send_sms":true,"send_email":true,"app_url":"http://localhost:54321/"}') where id=$1`, [P]);
+  const lulu = (await db.query(`select s.id from pms_stays s join pms_rooms r on r.id=s.room_id where r.number='334' and s.property_id=$1 and s.status='checked_in'`, [P])).rows[0]?.id;
+  if (lulu) {
+    const link = (await db.query(`select pms__portal_issue($1,true,true,null) r`, [lulu])).rows[0].r.link;
+    const token = link.split('/stay/')[1];
+    writeFileSync(join(APP, 'tests/local-stack/.portal-link'), link + '\n');
+    const key = (await db.query(`select pms_portal_desk_key($1) k`, [lulu])).rows[0].k;
+    const session = (await db.query(`select pms_portal_login($1,$2) r`, [token, key])).rows[0].r.session;
+    writeFileSync(join(APP, 'tests/local-stack/.portal-session'), session + '\n');
+    await db.query(`select pms_portal_request($1,'{"kind":"towels","details":"Two extra bath towels please"}'::jsonb)`, [session]);
+    const menu = (await db.query(`select pms_portal_home($1) h`, [session])).rows[0].h.menu;
+    if (menu.length >= 2) await db.query(`select pms_portal_request($1,$2::jsonb)`, [session, JSON.stringify({ kind: 'food', details: 'No chilli please', items: [{ item_id: menu[0].id, qty: 2 }, { item_id: menu[1].id, qty: 1 }] })]);
+    // welcome page: letter, Wi-Fi, guide, documents and offers; and the portal look (set by BMG)
+    await db.query(`update pms_properties set settings = jsonb_set(settings, '{guest_portal}', settings->'guest_portal' || $2::jsonb) where id=$1`, [P, JSON.stringify({
+      welcome_text: 'We are delighted to have you with us at Unreal Homes.\n\nYour apartment has been prepared especially for you. Breakfast is served from 06:30 to 10:00, and our team is here day and night: just ask through this page.',
+      welcome_signed: 'Balati and the Unreal Homes team', wifi_name: 'UnrealHomes-Guest', wifi_password: 'karibu2026' })]);
+    await db.query(`insert into pms_portal_content(property_id,kind,title,body,sort_order) values
+      ($1,'guide','Breakfast','Served daily from 06:30 to 10:00 in the garden restaurant. Room service breakfast can be ordered from this page.',1),
+      ($1,'guide','Swimming pool','Open 07:00 to 19:00. Towels are at the pool bar. Children must be with an adult.',2),
+      ($1,'guide','Airport transfers','Our driver can take you to Julius Nyerere International Airport (about 35 minutes). Ask through Services → Book a taxi.',3),
+      ($1,'guide','Emergency numbers','Reception: 0740 042 042 (24 hours). Police: 112. Nearest hospital: Aga Khan Hospital, Ocean Road.',4),
+      ($1,'guide','House rules','Quiet hours 22:00 to 07:00. Smoking only on balconies. Check-out by 10:00; ask us about late check-out.',5)`, [P]);
+    await db.query(`insert into pms_portal_content(property_id,kind,title,body,price,sort_order) values
+      ($1,'offer','Sunset dhow cruise','Two hours on the Indian Ocean with snacks and soft drinks. Departs 17:00 from Slipway.',85000,1),
+      ($1,'offer','Couples massage','60 minutes of full-body massage at our partner spa, with herbal tea.',120000,2),
+      ($1,'offer','Zanzibar day trip','Ferry, Stone Town walking tour and lunch. Pick-up from the hotel at 06:30.',250000,3)`, [P]);
+    await db.query(`insert into pms_portal_content(property_id,kind,title,body,file_url) values ($1,'document','Guest handbook','Everything about your stay (PDF)','https://example.supabase.co/storage/v1/object/public/property-media/handbook.pdf')`, [P]);
+    await db.query(`insert into pms_portal_themes(property_id, preset, heading_font, tagline) values ($1,'bmg','rounded','Your home in the heart of Dar es Salaam') on conflict (property_id) do nothing`, [P]);
+    console.log('guest portal link (Lulu, room 334):', link);
+  }
 }
 console.log('seeded property', P);
 

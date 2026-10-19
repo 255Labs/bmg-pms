@@ -111,6 +111,10 @@ export const PRIVILEGES = [
   { key: 'rpt.purchases', label: 'Purchases and goods received', roles: [O, M, A, S] },
   { key: 'rpt.creditors', label: 'Supplier balances (creditors)', roles: [O, M, A] },
   { key: 'rpt.audit_resolve', label: 'Clear occupancy audit findings', roles: [O, M] },
+  { key: 'res.reinstate', label: 'Reinstate a no-show or cancelled booking', roles: [O, M] },
+  { key: 'fo.portal', label: 'Send and stop guest portal links', roles: FO },
+  { key: 'fo.requests', label: 'See and handle guest portal requests', roles: [O, M, F, H] },
+  { key: 'hk.maintenance', label: 'Put rooms under maintenance and back (housekeeping board)', roles: [O, M, H] },
 ].map((p) => ({ ...p, group: p.key.split('.')[0] }));
 
 export const PRIVILEGE_BY_KEY = Object.fromEntries(PRIVILEGES.map((p) => [p.key, p]));

@@ -6,6 +6,7 @@ import { Badge, Field, Modal, PageHead, Table, useAction } from '../components/u
 import { PRIVILEGES, PRIVILEGE_GROUPS, roleDefaults } from '../lib/privileges.js';
 import { NIGHT_DEFAULT } from '../lib/nightmode.js';
 import Subscription from '../components/Subscription.jsx';
+import { GUEST_PAYMENTS } from '../lib/modules.js';
 
 // Setup hub: one searchable list of everything that shapes how the property runs
 const SECTIONS = [
@@ -40,6 +41,7 @@ const SECTIONS = [
     ['messages', 'Automatic texts', 'Booking, check-in and goodbye SMS'],
     ['documents', 'Printed documents', 'Footers on folios and confirmations'],
     ['website', 'Online booking', 'Your booking page, rules and payments'],
+    ['portal', 'Guest portal', 'Link at check-in, food orders and service requests'],
   ] },
   { group: 'Team', items: [
     ['staff', 'People and access', 'Invite, give roles, adjust one person, switch off'],
@@ -92,14 +94,14 @@ export default function Setup({ params }) {
         </nav>
         <section className="hub-body">
           <div className="hub-title"><span className="muted small">{current.group}</span><h2 className="first">{current.title}</h2></div>
-          <Section id={sec} />
+          <SetupSection id={sec} />
         </section>
       </div>
     </>
   );
 }
 
-function Section({ id }) {
+export function SetupSection({ id }) {
   const { lookups, refresh, property, role, reloadProperties } = useProperty();
   switch (id) {
     case 'subscription': return <Subscription propertyId={property.id} role={role} onPaid={reloadProperties} />;
@@ -168,6 +170,7 @@ function Section({ id }) {
     case 'messages': return <Messages />;
     case 'documents': return <Documents />;
     case 'website': return <Website />;
+    case 'portal': return <PortalSettings />;
     case 'staff': return <Staff />;
     case 'access': return <Access />;
     case 'roles': return <Roles />;
@@ -597,12 +600,175 @@ function Website() {
           <Field label="Welcome line"><input maxLength={160} value={b.intro} onChange={(e) => setB({ ...b, intro: e.target.value })} placeholder="Karibu! Book direct for our best rate." /></Field>
         </div>
         <label className="check"><input type="checkbox" checked={b.require_terms} onChange={(e) => setB({ ...b, require_terms: e.target.checked })} /> Guests must accept your policies to book</label>
-        <label className="check"><input type="checkbox" checked={b.pay_now_mobile} onChange={(e) => setB({ ...b, pay_now_mobile: e.target.checked })} /> Offer "pay now by mobile money" (needs Mobile money switched on under Integrations)</label>
-        {b.pay_now_mobile && <Field label="Deposit asked online (%)"><input type="number" min={1} max={100} value={b.deposit_pct} onChange={(e) => setB({ ...b, deposit_pct: e.target.value })} /></Field>}
+        {GUEST_PAYMENTS && <label className="check"><input type="checkbox" checked={b.pay_now_mobile} onChange={(e) => setB({ ...b, pay_now_mobile: e.target.checked })} /> Offer "pay now by mobile money" (needs Mobile money switched on under Integrations)</label>}
+        {GUEST_PAYMENTS && b.pay_now_mobile && <Field label="Deposit asked online (%)"><input type="number" min={1} max={100} value={b.deposit_pct} onChange={(e) => setB({ ...b, deposit_pct: e.target.value })} /></Field>}
         <p className="small muted">Which rate plans appear online is set under Rate plans; prices, closures and minimum nights come from the rate calendar. A guest can make at most three online bookings a day.</p>
       </div>
       <button className="btn btn-primary" disabled={busy}>Save online booking</button>
     </form>
+  );
+}
+
+const PORTAL_SERVICES = [['housekeeping', 'Clean my room'], ['towels', 'Fresh towels'], ['amenities', 'Toiletries, pillows or blankets'],
+  ['maintenance', 'Something needs fixing'], ['laundry', 'Laundry pick-up'], ['taxi', 'Book a taxi'], ['wakeup', 'Wake-up call'],
+  ['late_checkout', 'Late check-out'], ['other', 'Something else']];
+
+function PortalSettings() {
+  const { property } = useProperty();
+  const [s, save, busy] = useSettings();
+  const [outlets, setOutlets] = useState([]);
+  const [g, setG] = useState({ enabled: false, auto_send: true, send_sms: true, send_email: true, food: true, outlet_id: '', welcome: '',
+    services: PORTAL_SERVICES.map(([k]) => k), ...(s.guest_portal ?? {}) });
+  useEffect(() => {
+    supabase.from('pms_pos_outlets').select('id,name,outlet_type').eq('property_id', property.id).eq('active', true).order('name')
+      .then(({ data }) => setOutlets((data ?? []).filter((o) => !['gym', 'pool', 'games', 'spa', 'tours', 'events'].includes(o.outlet_type))));
+  }, [property.id]);
+  const inPackage = property.features?.guest_portal !== false;
+  const toggle = (k) => setG({ ...g, services: g.services.includes(k) ? g.services.filter((x) => x !== k) : [...g.services, k] });
+  return (
+    <>
+    <form onSubmit={(e) => { e.preventDefault(); save({ guest_portal: { ...g, outlet_id: g.outlet_id || null, welcome: g.welcome || null, app_url: `${window.location.origin}${window.location.pathname}` } }, 'Guest portal saved'); }}>
+      {!inPackage && <p className="note danger">The guest portal is not part of this property's BMG PMS package. Ask BMG to add it.</p>}
+      <div className="card stack">
+        <label className="check big"><input type="checkbox" checked={g.enabled} onChange={(e) => setG({ ...g, enabled: e.target.checked })} /> <strong>Give every checked-in guest their own portal</strong></label>
+        <p className="small muted">At check-in the guest gets a private link. To open it they ask for a 6-digit key, which goes only to the mobile number or email on the booking. The link stops working the moment they check out. Every request pops up for staff, on the guest's bar in Stay view and on the reservation.</p>
+        <label className="check"><input type="checkbox" checked={g.auto_send} onChange={(e) => setG({ ...g, auto_send: e.target.checked })} /> Send the link by itself at check-in</label>
+        <div className="grid-2">
+          <label className="check"><input type="checkbox" checked={g.send_sms} onChange={(e) => setG({ ...g, send_sms: e.target.checked })} /> By text message (needs SMS switched on under Integrations)</label>
+          <label className="check"><input type="checkbox" checked={g.send_email} onChange={(e) => setG({ ...g, send_email: e.target.checked })} /> By email</label>
+        </div>
+        <p className="small muted">For WhatsApp, press "Send on WhatsApp" on the reservation: it opens WhatsApp with the message ready for the guest's number.</p>
+        <Field label="Welcome line" hint="{guest}, {property} and {room} are filled in. The link is added after it.">
+          <input maxLength={200} value={g.welcome ?? ''} onChange={(e) => setG({ ...g, welcome: e.target.value })} placeholder="Karibu {guest}! Order food and ask for anything during your stay at {property} here:" />
+        </Field>
+      </div>
+      <div className="card stack">
+        <h3 className="first">Welcome page</h3>
+        <p className="small muted">The first page a guest sees after signing in: this letter, their name and booking (room, dates, nights, guests, plan), the Wi-Fi, offers, the guide and documents below.</p>
+        <div className="grid-2">
+          <Field label="Heading" hint="Empty: “Karibu, <first name>!”"><input maxLength={80} value={g.welcome_title ?? ''} onChange={(e) => setG({ ...g, welcome_title: e.target.value })} /></Field>
+          <Field label="Signed"><input maxLength={80} value={g.welcome_signed ?? ''} onChange={(e) => setG({ ...g, welcome_signed: e.target.value })} placeholder="The Unreal Homes team" /></Field>
+        </div>
+        <Field label="Welcome letter" hint="A blank line starts a new paragraph."><textarea rows={5} maxLength={2000} value={g.welcome_text ?? ''} onChange={(e) => setG({ ...g, welcome_text: e.target.value })}
+          placeholder={'We are delighted to have you with us.\n\nBreakfast is served from 06:30 to 10:00…'} /></Field>
+        <div className="grid-2">
+          <Field label="Wi-Fi name"><input maxLength={60} value={g.wifi_name ?? ''} onChange={(e) => setG({ ...g, wifi_name: e.target.value })} /></Field>
+          <Field label="Wi-Fi password" hint="Shown only to signed-in guests"><input maxLength={60} value={g.wifi_password ?? ''} onChange={(e) => setG({ ...g, wifi_password: e.target.value })} /></Field>
+        </div>
+      </div>
+      <div className="card stack">
+        <h3 className="first">Food orders</h3>
+        <label className="check"><input type="checkbox" checked={g.food} onChange={(e) => setG({ ...g, food: e.target.checked })} /> Guests can order food to their room</label>
+        {g.food && <Field label="Menu from" hint="Dishes that need a choice (such as how a steak is cooked) are left out; guests can add notes.">
+          <select value={g.outlet_id ?? ''} onChange={(e) => setG({ ...g, outlet_id: e.target.value })}>
+            <option value="">Room service, else the restaurant</option>
+            {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </Field>}
+        <p className="small muted">An order is charged to the room only when staff accept it: accepting opens the outlet bill, sends it to the kitchen display and posts it to the folio.</p>
+      </div>
+      <div className="card stack">
+        <h3 className="first">Services guests can ask for</h3>
+        <div className="grid-3">{PORTAL_SERVICES.map(([k, l]) => (
+          <label key={k} className="check"><input type="checkbox" checked={g.services.includes(k)} onChange={() => toggle(k)} /> {l}</label>
+        ))}</div>
+      </div>
+      <button className="btn btn-primary" disabled={busy}>Save guest portal</button>
+    </form>
+    <PortalContent />
+    </>
+  );
+}
+
+// Hotel guide sections, offers and ads, and documents (PDF manuals, menus) shown on the guest's welcome page
+const CONTENT_KINDS = [['guide', 'Hotel guide', 'Breakfast hours, pool, gym, house rules, emergency numbers…'],
+  ['offer', 'Offers and ads', 'Spa deals, tours, transfers, dinners. Guests tap “I’m interested” and staff get a request.'],
+  ['document', 'Documents', 'PDF manuals, the room-service menu, maps']];
+export function PortalContent({ propertyId }) {
+  const { property } = useProperty();
+  const pid = propertyId ?? property.id;
+  const [run, busy] = useAction();
+  const [rows, setRows] = useState([]);
+  const [kind, setKind] = useState('guide');
+  const [edit, setEdit] = useState(null);
+  const load = useCallback(() => supabase.from('pms_portal_content').select('*').eq('property_id', pid).order('sort_order').order('created_at')
+    .then(({ data }) => setRows(data ?? [])), [pid]);
+  useEffect(() => { load(); }, [load]);
+  const upload = async (file, pdf) => {
+    if (!file) return null;
+    if (pdf ? file.type !== 'application/pdf' : !file.type.startsWith('image/')) throw new Error(pdf ? 'Choose a PDF file' : 'Choose an image (JPG, PNG or WebP)');
+    if (file.size > (pdf ? 15 : 5) * 1024 * 1024) throw new Error(pdf ? 'PDFs must be under 15 MB' : 'Images must be under 5 MB');
+    const path = `${pid}/portal/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`;
+    const { error } = await supabase.storage.from('property-media').upload(path, file, { contentType: file.type });
+    if (error) throw error;
+    return supabase.storage.from('property-media').getPublicUrl(path).data.publicUrl;
+  };
+  const save = (e) => {
+    e.preventDefault();
+    const row = { property_id: pid, kind: edit.kind, title: edit.title.trim(), body: edit.body?.trim() || null, image_url: edit.image_url || null, file_url: edit.file_url || null,
+      link_url: edit.link_url?.trim() || null, price: edit.price === '' || edit.price == null ? null : Number(edit.price), starts_on: edit.starts_on || null, ends_on: edit.ends_on || null,
+      sort_order: Number(edit.sort_order) || 0, active: edit.active !== false };
+    run(async () => {
+      const q = edit.id ? supabase.from('pms_portal_content').update(row).eq('id', edit.id) : supabase.from('pms_portal_content').insert(row);
+      const { error } = await q; if (error) throw new Error(/check/.test(error.message) ? 'Links, photos and files must be https addresses; end date after start' : error.message);
+    }, 'Saved').then(() => { setEdit(null); load(); }).catch(() => {});
+  };
+  const remove = (r) => window.confirm(`Remove “${r.title}”?`) && run(async () => { const { error } = await supabase.from('pms_portal_content').delete().eq('id', r.id); if (error) throw error; }, 'Removed').then(load).catch(() => {});
+  const shown = rows.filter((r) => r.kind === kind);
+  const [, title, hint] = CONTENT_KINDS.find((k) => k[0] === kind);
+  return (
+    <div className="card stack portal-content">
+      <h3 className="first">Guide, offers and documents</h3>
+      <div className="seg seg-inline" role="group">{CONTENT_KINDS.map(([k, l]) => (
+        <button type="button" key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{l} ({rows.filter((r) => r.kind === k).length})</button>
+      ))}</div>
+      <p className="small muted">{hint}</p>
+      {shown.length === 0 ? <p className="muted">Nothing in {title.toLowerCase()} yet.</p> : (
+        <div className="pc-list">{shown.map((r) => (
+          <div key={r.id} className={`pc-row ${r.active ? '' : 'off'}`}>
+            {r.image_url ? <img src={r.image_url} alt="" /> : <span className="pc-ic" aria-hidden="true">{kind === 'document' ? '📄' : kind === 'offer' ? '✨' : '📘'}</span>}
+            <div className="pc-text"><strong>{r.title}</strong><span className="small muted">{[r.price != null && `${property.currency} ${Number(r.price).toLocaleString()}`, r.ends_on && `until ${fmtDate(r.ends_on)}`, r.file_url && 'PDF attached', !r.active && 'hidden'].filter(Boolean).join(' · ') || (r.body ?? '').slice(0, 80)}</span></div>
+            <button type="button" className="btn btn-small" onClick={() => setEdit({ ...r, price: r.price ?? '' })}>Edit</button>
+            <button type="button" className="btn btn-small btn-danger-ghost" onClick={() => remove(r)}>Remove</button>
+          </div>
+        ))}</div>
+      )}
+      <button type="button" className="btn" onClick={() => setEdit({ kind, title: '', body: '', active: true, sort_order: shown.length + 1, price: '' })}>Add to {title.toLowerCase()}</button>
+      {edit && (
+        <Modal title={edit.id ? `Edit: ${edit.title}` : `Add to ${title.toLowerCase()}`} onClose={() => setEdit(null)}
+          footer={<><button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button><button type="submit" form="pc-form" className="btn btn-primary" disabled={busy || !edit.title.trim()}>Save</button></>}>
+          <form id="pc-form" className="stack" onSubmit={save}>
+            <Field label="Title"><input required maxLength={120} value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} /></Field>
+            <Field label={edit.kind === 'document' ? 'Short description' : 'Text'}><textarea rows={4} maxLength={4000} value={edit.body ?? ''} onChange={(e) => setEdit({ ...edit, body: e.target.value })} /></Field>
+            {edit.kind !== 'document' && (
+              <div className="row-gap">
+                {edit.image_url && <img src={edit.image_url} alt="" className="pc-preview" />}
+                <label className="btn">{edit.image_url ? 'Change photo' : 'Add a photo'}<input type="file" accept="image/*" hidden onChange={(e) => run(() => upload(e.target.files[0], false)).then((u) => u && setEdit((x) => ({ ...x, image_url: u }))).catch(() => {})} /></label>
+                {edit.image_url && <button type="button" className="btn btn-ghost" onClick={() => setEdit({ ...edit, image_url: null })}>Remove photo</button>}
+              </div>
+            )}
+            {edit.kind !== 'offer' && (
+              <div className="row-gap">
+                <label className="btn">{edit.file_url ? 'Replace PDF' : 'Attach a PDF'}<input type="file" accept="application/pdf" hidden onChange={(e) => run(() => upload(e.target.files[0], true)).then((u) => u && setEdit((x) => ({ ...x, file_url: u }))).catch(() => {})} /></label>
+                {edit.file_url && <a href={edit.file_url} target="_blank" rel="noopener noreferrer" className="small">Open the PDF</a>}
+              </div>
+            )}
+            {edit.kind === 'offer' && (
+              <div className="grid-3">
+                <Field label={`Price (${property.currency})`}><input type="number" min={0} value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></Field>
+                <Field label="Shown from"><input type="date" value={edit.starts_on ?? ''} onChange={(e) => setEdit({ ...edit, starts_on: e.target.value })} /></Field>
+                <Field label="Until"><input type="date" value={edit.ends_on ?? ''} onChange={(e) => setEdit({ ...edit, ends_on: e.target.value })} /></Field>
+              </div>
+            )}
+            <div className="grid-2">
+              <Field label="Link (optional)" hint="https:// only"><input type="url" value={edit.link_url ?? ''} onChange={(e) => setEdit({ ...edit, link_url: e.target.value })} placeholder="https://" /></Field>
+              <Field label="Order"><input type="number" value={edit.sort_order} onChange={(e) => setEdit({ ...edit, sort_order: e.target.value })} /></Field>
+            </div>
+            <label className="check"><input type="checkbox" checked={edit.active !== false} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} /> Show to guests</label>
+          </form>
+        </Modal>
+      )}
+    </div>
   );
 }
 

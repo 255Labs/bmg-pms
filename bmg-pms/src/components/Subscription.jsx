@@ -246,7 +246,11 @@ export function SubscriptionStrip({ propertyId, role, onOpen }) {
 // What this property has, and what else BMG can switch on. Prices are set by BMG; ask them to change the package.
 function MyPackage({ propertyId }) {
   const [rows, setRows] = useState(null);
-  useEffect(() => { rpc('pms_my_package', { p_property: propertyId }).then(setRows).catch(() => setRows([])); }, [propertyId]);
+  const [quote, setQuote] = useState(null);
+  useEffect(() => {
+    rpc('pms_my_package', { p_property: propertyId }).then(setRows).catch(() => setRows([]));
+    rpc('pms_package_quote', { p_property: propertyId }).then(setQuote).catch(() => setQuote(null));
+  }, [propertyId]);
   if (!rows?.length) return null;
   const today = new Date().toISOString().slice(0, 10);
   const price = (r) => (r.included ? 'In your plan' : r.free_until && r.free_until >= today ? `Free to ${fmtDate(r.free_until)}`
@@ -256,8 +260,9 @@ function MyPackage({ propertyId }) {
   return (
     <>
       <h3>Your package</h3>
+      {quote && <OwnerSummary q={quote} />}
       <div className="pkg-list">
-        {on.map((r) => <div key={r.key} className="pkg-row on"><span><strong>{r.name}</strong>{r.description && <div className="small muted">{r.description}</div>}</span><span className="pkg-price">{price(r)}</span></div>)}
+        {on.map((r) => <div key={r.key} className="pkg-row on"><span><strong>{r.name}</strong>{r.description && <div className="small muted">{r.description}</div>}</span><span className="pkg-price">{quote?.full_package && !r.included ? 'In the Full package' : price(r)}</span></div>)}
       </div>
       {off.length > 0 && <>
         <h4>Can be added</h4>
@@ -267,5 +272,23 @@ function MyPackage({ propertyId }) {
         <p className="small muted">To add or remove something, contact BMG; changes show on the next monthly invoice.</p>
       </>}
     </>
+  );
+}
+
+function OwnerSummary({ q }) {
+  const full = (q.full_package_options ?? []).filter((o) => Number(o.monthly) > 0);
+  return (
+    <div className="pkg-summary">
+      <div className="pkg-total">
+        <span className="small muted">{q.full_package ? 'You are on the Full package' : q.agreed_price != null ? 'Your agreed price' : 'You pay feature by feature'}</span>
+        <strong>{money(q.total_monthly)}<small> a month before VAT</small></strong>
+        {!q.full_package && <span className="small">Plan {money(q.plan_monthly)} + features {money(q.addons_monthly)}</span>}
+      </div>
+      {!q.full_package && full.map((o) => {
+        const diff = Number(o.monthly) - Number(q.total_monthly);
+        return <div key={o.plan_id} className="pkg-compare"><span className="small muted">{o.plan}: every feature included</span><strong>{money(o.monthly)}</strong>
+          <span className={`small ${diff < 0 ? 'good' : 'muted'}`}>{diff < 0 ? `Would save you ${money(-diff)} a month` : `${money(diff)} more a month, with every feature`}</span></div>;
+      })}
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { addDays, fmtDate, guestName, money, nightsBetween, label } from '../lib
 import { Loading } from '../components/ui.jsx';
 import Icon from '../components/icons.jsx';
 import StayKey from '../components/StayKey.jsx';
+import { useGuestRequests } from '../components/GuestRequests.jsx';
 
 const DAYS = 14;
 const LIVE = ['tentative', 'confirmed', 'checked_in', 'checked_out'];
@@ -13,6 +14,7 @@ const LIVE = ['tentative', 'confirmed', 'checked_in', 'checked_out'];
 export default function StayView() {
   const { property, lookups, version } = useProperty();
   const desk = useDesk();
+  const { byStay } = useGuestRequests();
   const [start, setStart] = useState(property.business_date);
   const [data, setData] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -96,7 +98,10 @@ export default function StayView() {
   const StayBar = ({ s }) => {
     const g = s.pms_reservations?.pms_guests;
     const vip = (g?.attributes ?? []).some((t) => /vip/i.test(t));
+    const asks = byStay[s.id] ?? [];
+    const fresh = asks.filter((r) => r.status === 'new').length;
     const flags = [
+      asks.length > 0 && ['bell', `${asks.length} guest request${asks.length === 1 ? '' : 's'} from the portal${fresh ? ` (${fresh} new)` : ''}: ${asks.map((r) => r.title).join(', ')}`],
       s.owing > 0 && ['checked_in', 'checked_out'].includes(s.status) && ['coin', `Owes ${money(s.owing)}`],
       vip && ['star', 'VIP'],
       s.group && ['people', 'Part of a group booking'],
@@ -105,9 +110,9 @@ export default function StayView() {
     const tip = [`#${s.pms_reservations?.res_no} ${guestName(g)}`, `${fmtDate(s.arrival)} → ${fmtDate(s.departure)} · ${label(phase(s) || s.status)}`,
       `${money(s.rate)} / night`, ...flags.map((f) => f[1])].join('\n');
     return (
-      <button className={`bar bar-${s.status} ${phase(s) ? 'bar-' + phase(s) : ''}`} style={bar(s)} title={tip}
+      <button className={`bar bar-${s.status} ${phase(s) ? 'bar-' + phase(s) : ''} ${fresh ? 'bar-ask' : ''}`} style={bar(s)} title={tip}
         onClick={(e) => { e.stopPropagation(); desk.openReservation(s.reservation_id); }}>
-        {flags.length > 0 && <span className="bar-flags">{flags.map(([i, t]) => <span key={i} className={`bar-flag f-${i}`} aria-label={t}><Icon name={i} size={11} /></span>)}</span>}
+        {flags.length > 0 && <span className="bar-flags">{flags.map(([i, t]) => <span key={i} className={`bar-flag f-${i}`} aria-label={t}><Icon name={i} size={11} />{i === 'bell' && asks.length > 1 && <b>{asks.length}</b>}</span>)}</span>}
         <span className="bar-name">{(nightsBetween(s.arrival, s.departure) <= 1 ? g?.first_name : [g?.first_name, g?.last_name].filter(Boolean).join(' ')) || 'Guest'}</span>
       </button>
     );

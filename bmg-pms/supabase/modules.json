@@ -20,7 +20,8 @@
       "about": "Booking, check-in and out, room moves, amendments and their charge previews",
       "tests": [
         "test:db",
-        "test:review"
+        "test:review",
+        "test:housekeeping"
       ]
     },
     "night-audit": {
@@ -117,6 +118,12 @@
       "about": "Occupancy audit: camera sightings and door openings against check-ins, check-outs and payments; findings and their reports",
       "tests": [
         "test:audit"
+      ]
+    },
+    "guest-portal": {
+      "about": "Guest portal: private links sent at check-in, login keys, food orders and service requests, and the staff's live request list",
+      "tests": [
+        "test:portal"
       ]
     }
   },

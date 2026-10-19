@@ -4,7 +4,7 @@
 set -euo pipefail
 : "${SUPABASE_PROJECT_REF:?Set SUPABASE_PROJECT_REF}"
 cd "$(dirname "$0")/.."
-for fn in channex-sync channex-webhook ttlock-sync hikvision-ingest fiscal-sync pos-gateway payments-sync clickpesa-webhook sms-sync integration-catalog quickbooks-oauth quickbooks-sync; do
+for fn in channex-sync channex-webhook ttlock-sync hikvision-ingest fiscal-sync pos-gateway payments-sync clickpesa-webhook sms-sync email-sync integration-catalog quickbooks-oauth quickbooks-sync; do
   echo "-> $fn"
   supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF"
 done

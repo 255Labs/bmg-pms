@@ -11,5 +11,10 @@ export const MODULES = {
   assets: { label: 'Room assets', pages: ['assets'] },
   integrations: { label: 'Integrations and revenue assurance', pages: ['integrations', 'revenue-assurance'] },
   import: { label: 'Import from eZee', pages: ['import'] },
+  guest_portal: { label: 'Guest portal', pages: ['guest-requests'] },
 };
 
+
+// Guest mobile-money payments (folio requests and "pay now" on the booking page) are switched off for now.
+// BMG's own subscription collection is separate and stays on. Set to true to bring the guest side back.
+export const GUEST_PAYMENTS = false;

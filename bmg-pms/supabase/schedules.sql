@@ -27,6 +27,7 @@ select cron.schedule('pms-ttlock-sync',  '*/5 * * * *', $$ select pms_call_funct
 select cron.schedule('pms-fiscal-sync',  '* * * * *',   $$ select pms_call_function('fiscal-sync') $$);
 select cron.schedule('pms-payments-sync', '* * * * *',   $$ select pms_call_function('payments-sync') $$);
 select cron.schedule('pms-sms-sync',      '* * * * *',   $$ select pms_call_function('sms-sync') $$);
+select cron.schedule('pms-email-sync',    '* * * * *',   $$ select pms_call_function('email-sync') $$);
 select cron.schedule('pms-quickbooks-sync', '*/5 * * * *', $$ select pms_call_function('quickbooks-sync') $$);
 
 -- BMG subscriptions: invoices, overdue and locks are worked out inside the database every hour, even if the
@@ -42,4 +43,5 @@ select cron.schedule('pms-cleanup', '30 3 * * *', $$
   delete from pms_jobs where status = 'done' and updated_at < now() - interval '30 days';
   delete from pms_integration_log where created_at < now() - interval '90 days';
   delete from pms_camera_events where event_time < now() - interval '180 days';
+  delete from pms_guest_portal_sessions where last_seen_at < now() - interval '30 days';
 $$);

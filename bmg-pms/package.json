@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test:db": "node tests/scenario.test.mjs",
     "test:mw": "node tests/middleware.test.mjs",
-    "test": "node tests/scenario.test.mjs && node tests/middleware.test.mjs && node tests/platform.test.mjs && node tests/payments.test.mjs && node tests/stock_assets.test.mjs && node tests/control_panel.test.mjs && node tests/security.test.mjs && node tests/activities.test.mjs && node tests/operations.test.mjs && node tests/permissions.test.mjs && npm run test:privileges && npm run test:review && npm run test:nightmode && npm run test:billing && npm run test:isolation && npm run test:pos && npm run test:procurement && npm run test:quickbooks && npm run test:packages && npm run test:relay && npm run test:audit",
+    "test": "node tests/scenario.test.mjs && node tests/middleware.test.mjs && node tests/platform.test.mjs && node tests/payments.test.mjs && node tests/stock_assets.test.mjs && node tests/control_panel.test.mjs && node tests/security.test.mjs && node tests/activities.test.mjs && node tests/operations.test.mjs && node tests/permissions.test.mjs && npm run test:privileges && npm run test:review && npm run test:nightmode && npm run test:billing && npm run test:isolation && npm run test:pos && npm run test:procurement && npm run test:quickbooks && npm run test:packages && npm run test:relay && npm run test:audit && npm run test:portal && npm run test:housekeeping",
     "test:platform": "node tests/platform.test.mjs",
     "test:payments": "node tests/payments.test.mjs",
     "test:stock": "node tests/stock_assets.test.mjs",
@@ -27,12 +27,15 @@
     "db:check": "node scripts/db-modules.mjs check",
     "db:lock": "node scripts/db-modules.mjs lock",
     "db:headers": "node scripts/db-modules.mjs headers",
+    "db:report": "node scripts/db-report.mjs",
     "test:pos": "node tests/pos.test.mjs",
     "test:procurement": "node tests/procurement.test.mjs",
     "test:quickbooks": "node tests/quickbooks.test.mjs",
     "test:packages": "node tests/packages.test.mjs",
     "test:relay": "node tests/hikvision-relay.test.mjs",
-    "test:audit": "node tests/audit.test.mjs"
+    "test:audit": "node tests/audit.test.mjs",
+    "test:portal": "node tests/portal.test.mjs",
+    "test:housekeeping": "node tests/housekeeping.test.mjs"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",

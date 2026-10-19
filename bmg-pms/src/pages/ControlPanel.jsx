@@ -6,12 +6,16 @@ import { fmtDate, fmtDateTime, label, money, ROLES } from '../lib/format';
 import { Badge, Drawer, Field, Loading, PageHead, Table, Tabs, useAction } from '../components/ui.jsx';
 import { MODULES } from '../lib/modules.js';
 import ControlBilling from './ControlBilling.jsx';
+import PortalLook from '../components/PortalLook.jsx';
+import { SetupSection } from './Setup.jsx';
+import { MenuSetup } from './Pos.jsx';
 
 // Platform administrators only: every property, people across properties, activity, administrators.
 export default function ControlPanel({ params, standalone }) {
   const { isAdmin } = useProperty();
   const [tab, setTab] = useState(params?.tab ?? 'properties');
-  useEffect(() => { if (params?.tab) setTab(params.tab); }, [params?.tab]);
+  const [contentFor, setContentFor] = useState(params?.property ?? '');
+  useEffect(() => { if (params?.tab) setTab(params.tab); if (params?.property) setContentFor(params.property); }, [params?.tab, params?.property]);
   const [mfaOn, setMfaOn] = useState(true);
   useEffect(() => { if (isAdmin) rpc('pms_my_mfa_on').then(setMfaOn).catch(() => {}); }, [isAdmin]);
   if (!isAdmin) return <><PageHead title="Control panel" /><p>Only platform administrators can open the control panel.</p></>;
@@ -24,9 +28,10 @@ export default function ControlPanel({ params, standalone }) {
           <a href="#/security">Set it up now</a>
         </div>
       )}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'properties', label: 'Properties' }, { value: 'new', label: 'Open a property' },
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'properties', label: 'Properties' }, { value: 'content', label: 'Content and portal look' }, { value: 'new', label: 'Open a property' },
         { value: 'billing', label: 'Billing' }, { value: 'people', label: 'People' }, { value: 'activity', label: 'Activity' }, { value: 'admins', label: 'Administrators' }]} />
-      {tab === 'properties' && <Properties standalone={standalone} />}
+      {tab === 'properties' && <Properties standalone={standalone} onContent={(id) => { setContentFor(id); setTab('content'); }} />}
+      {tab === 'content' && <PropertyContent propertyId={contentFor} onPick={setContentFor} standalone={standalone} />}
       {tab === 'new' && <NewProperty done={() => setTab('properties')} />}
       {tab === 'billing' && <ControlBilling />}
       {tab === 'people' && <People />}
@@ -36,7 +41,7 @@ export default function ControlPanel({ params, standalone }) {
   );
 }
 
-function Properties({ standalone }) {
+function Properties({ standalone, onContent }) {
   const [rows, setRows] = useState(null);
   const [open, setOpen] = useState(null);
   const [q, setQ] = useState('');
@@ -68,12 +73,12 @@ function Properties({ standalone }) {
         { key: 'last_activity', label: 'Last activity', render: (r) => <span className="small muted">{r.last_activity ? fmtDateTime(r.last_activity) : 'Never'}</span> },
         { key: 'failed_jobs', label: '', render: (r) => (r.failed_jobs ? <Badge kind="red">{r.failed_jobs} failed</Badge> : null) },
       ]} />
-      {open && <PropertyDrawer row={open} onClose={() => setOpen(null)} onChanged={() => { load(); }} standalone={standalone} />}
+      {open && <PropertyDrawer row={open} onClose={() => setOpen(null)} onChanged={() => { load(); }} standalone={standalone} onContent={() => { setOpen(null); onContent(open.property_id); }} />}
     </>
   );
 }
 
-function PropertyDrawer({ row, onClose, onChanged, standalone }) {
+function PropertyDrawer({ row, onClose, onChanged, standalone, onContent }) {
   const { reloadProperties, switchProperty } = useProperty();
   const desk = useDesk();
   const [run, busy] = useAction();
@@ -103,6 +108,7 @@ function PropertyDrawer({ row, onClose, onChanged, standalone }) {
         </div>
         <div className="row-gap">
           <button className="btn btn-primary" disabled={busy} onClick={enter}>Open this property</button>
+          <button className="btn" disabled={busy} onClick={onContent}>Content and portal look</button>
           {row.status === 'active'
             ? <button className="btn btn-danger-ghost" disabled={busy} onClick={() => { const why = window.prompt(`Why suspend ${row.name}? Its staff lose access and its integrations stop until you reactivate it.`); if (why) save({ status: 'suspended', status_reason: why }, 'Property suspended'); }}>Suspend</button>
             : <button className="btn" disabled={busy} onClick={() => save({ status: 'active' }, 'Property reactivated')}>Reactivate</button>}
@@ -328,5 +334,54 @@ function Admins() {
         <button className="btn btn-primary" disabled={busy}>Make administrator</button>
       </form>
     </>
+  );
+}
+
+// Edit any hotel's content from here: the guest portal's look (no need to join), and, after joining as owner
+// (logged, as "Open this property"), its profile, photos, rooms, rates, menus and guest portal pages.
+const CONTENT_TABS = [
+  ['look', 'Portal look'], ['portal', 'Guest portal pages'], ['profile', 'Profile'], ['showcase', 'Logo and photos'], ['policies', 'Policies'],
+  ['rooms', 'Rooms'], ['plans', 'Rate plans'], ['taxes', 'Taxes'], ['payments', 'Payment methods'], ['extras', 'Extra charges'], ['menus', 'Restaurant and bar menus'],
+];
+function PropertyContent({ propertyId, onPick, standalone }) {
+  const { property, properties, reloadProperties, switchProperty } = useProperty();
+  const [run, busy] = useAction();
+  const [rows, setRows] = useState(null);
+  const [tab, setTab] = useState('look');
+  useEffect(() => { rpc('pms_admin_overview').then(setRows).catch(() => setRows([])); }, []);
+  const row = rows?.find((r) => r.property_id === propertyId);
+  const member = (properties ?? []).some((p) => p.property_id === propertyId);
+  const ready = member && property?.id === propertyId;
+  const join = () => run(async () => {
+    if (!member) await rpc('pms_admin_join_property', { p_property: propertyId });
+    await reloadProperties();
+    switchProperty(propertyId);
+  }, member ? null : `You are now an owner of ${row?.name} (logged)`).catch(() => {});
+  if (!rows) return <Loading />;
+  return (
+    <div className="cp-content">
+      <div className="row-gap cp-content-pick">
+        <Field label="Property">
+          <select value={propertyId} onChange={(e) => { onPick(e.target.value); setTab('look'); }}>
+            <option value="">Choose a property…</option>
+            {rows.map((r) => <option key={r.property_id} value={r.property_id}>{r.name}{r.code ? ` · ${r.code}` : ''}</option>)}
+          </select>
+        </Field>
+        {row && <span className="small muted">{row.rooms} rooms · {row.currency} · {row.status === 'active' ? 'active' : 'suspended'}</span>}
+      </div>
+      {!row ? <p className="muted">Choose a property to change its guest portal look, photos, rooms, rates and menus.</p> : <>
+        <div className="seg seg-inline cp-content-tabs" role="tablist">
+          {CONTENT_TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        </div>
+        {tab === 'look' ? <div className="card"><PortalLook propertyId={propertyId} propertyName={row.name} /></div>
+          : !ready ? (
+            <div className="card stack">
+              <p>{member ? `Switch to ${row.name} to edit its ${CONTENT_TABS.find((x) => x[0] === tab)[1].toLowerCase()} here.` : `To edit ${row.name}'s ${CONTENT_TABS.find((x) => x[0] === tab)[1].toLowerCase()}, you are added as an owner of the property. It is logged, the same as “Open this property”.`}</p>
+              <div><button className="btn btn-primary" disabled={busy} onClick={join}>{member ? `Edit ${row.name}` : `Join ${row.name} and edit`}</button></div>
+              {standalone && <p className="small muted">The property also appears in your property list at the top.</p>}
+            </div>
+          ) : <div className="cp-content-body">{tab === 'menus' ? <MenuSetup /> : <SetupSection id={tab} />}</div>}
+      </>}
+    </div>
   );
 }

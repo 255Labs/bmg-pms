@@ -63,6 +63,7 @@ const UI_PRIVS = {
   kitchen: ['pos.kitchen'], menu: ['pos.menu'],
   procurement: PRIVILEGES.filter((p) => p.group === 'proc').map((p) => p.key),
   accounting: ['acct.quickbooks'],
+  requests: ['fo.requests'],
 };
 
 export const can = (role, action) => {
@@ -106,6 +107,7 @@ export const can = (role, action) => {
     menu: ['owner', 'manager'],
     procurement: ['owner', 'manager', 'front_desk', 'accountant', 'housekeeping', 'storekeeper'],
     accounting: ['owner', 'manager', 'accountant'],
+    requests: ['owner', 'manager', 'front_desk', 'housekeeping'],
   };
   return (rules[action] ?? []).includes(role);
 };

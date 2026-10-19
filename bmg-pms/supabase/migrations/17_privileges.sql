@@ -103,7 +103,11 @@ insert into _cat values
   ('rpt.pos_z', 'rpt', 'Outlet end of day', array['owner','manager','front_desk','accountant']::text[], 78),
   ('rpt.purchases', 'rpt', 'Purchases and goods received', array['owner','manager','accountant','storekeeper']::text[], 79),
   ('rpt.creditors', 'rpt', 'Supplier balances (creditors)', array['owner','manager','accountant']::text[], 80),
-  ('rpt.audit_resolve', 'rpt', 'Clear occupancy audit findings', array['owner','manager']::text[], 81);
+  ('rpt.audit_resolve', 'rpt', 'Clear occupancy audit findings', array['owner','manager']::text[], 81),
+  ('res.reinstate', 'res', 'Reinstate a no-show or cancelled booking', array['owner','manager']::text[], 82),
+  ('fo.portal', 'fo', 'Send and stop guest portal links', array['owner','manager','front_desk']::text[], 83),
+  ('fo.requests', 'fo', 'See and handle guest portal requests', array['owner','manager','front_desk','housekeeping']::text[], 84),
+  ('hk.maintenance', 'hk', 'Put rooms under maintenance and back (housekeeping board)', array['owner','manager','housekeeping']::text[], 85);
 insert into pms_privilege_catalog select * from _cat
 on conflict (key) do update set grp = excluded.grp, label = excluded.label, default_roles = excluded.default_roles, sort_order = excluded.sort_order;
 delete from pms_privilege_catalog c where not exists (select 1 from _cat x where x.key = c.key);

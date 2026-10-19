@@ -5,6 +5,7 @@ import { useDesk } from '../lib/desk';
 import { useReservation, stayStatus, summarize, unpostedNights } from '../lib/reservation';
 import { addDays, can, fmtDate, fmtDateTime, guestName, label, money, nightsBetween } from '../lib/format';
 import { Badge, Field, Loading, Menu, Modal, Table, Tabs, statusKind, useAction } from '../components/ui.jsx';
+import { ReservationPortal } from '../components/GuestRequests.jsx';
 import FloorPlan from '../components/FloorPlan.jsx';
 import ChangeConfirm from '../components/ChangeConfirm.jsx';
 import ActionDialog from '../components/ActionDialog.jsx';
@@ -31,6 +32,7 @@ export default function ReservationPage({ params }) {
   const [tab, setTab] = useState(params.tab ?? 'folio');
   const [folioId, setFolioId] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const [reinstate, setReinstate] = useState(null);
   const [codes, setCodes] = useState([]);
   const bd = property.business_date;
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function ReservationPage({ params }) {
   const main = live[0] ?? res.pms_stays[0];
   const st = stayStatus(main, bd);
   const folio = res.pms_folios.find((f) => f.id === folioId);
-  const pax = live.reduce((a, s) => [a[0] + s.adults, a[1] + s.children], [0, 0]);
+  const pax = (live.length ? live : res.pms_stays).reduce((a, s) => [a[0] + s.adults, a[1] + s.children], [0, 0]);
   const done = async (fn, m) => { await run(fn, m); setDialog(null); reload(); refresh(); };
   const act = (fn, m) => run(fn, m).then(() => { reload(); refresh(); }).catch(() => {});
   const msg = confirmationText({ property, res, totals: t });
@@ -94,6 +96,9 @@ export default function ReservationPage({ params }) {
             <button className="btn btn-primary" onClick={() => setDialog({ kind: 'checkout', stay: main,
               onLate: (amount) => setDialog({ kind: 'roomcharge', sub: 'late_checkout', amount, folio: res.pms_folios.find((f) => f.stay_id === main.id && f.status === 'open') }) })}>Check out</button>
           )}
+          {main && ['no_show', 'cancelled'].includes(main.status) && main.departure > bd && can(role, 'res.reinstate') && (
+            <button className="btn btn-primary" onClick={() => setReinstate(main)}>Reinstate booking</button>
+          )}
           {main && ((main.status === 'checked_in' && main.arrival === bd && can(role, 'fo.undo_checkin'))
             || (main.status === 'checked_out' && main.departure >= bd && can(role, 'fo.undo_checkout'))) && (
             <Menu label="More" align="right" items={[
@@ -104,10 +109,12 @@ export default function ReservationPage({ params }) {
           <Menu label="Print / send" align="right" items={[
             folio && { label: `Print folio #${folio.folio_no}`, onClick: () => printFolio({ property, res, folio }) },
             g.email && { label: 'Email confirmation', onClick: () => window.open(mailLink(g.email, `Reservation #${res.res_no} — ${property.name}`, msg)) },
-            g.phone && { label: 'Send on WhatsApp', onClick: () => window.open(waLink(g.phone, msg), '_blank') },
+            g.phone && { label: 'Send on WhatsApp', onClick: () => window.open(waLink(g.phone, msg), '_blank', 'noopener') },
           ]} />
         </div>
       </header>
+
+      <ReservationPortal stays={res.pms_stays} />
 
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'folio', label: 'Folio' }, { value: 'booking', label: 'Booking details' }, { value: 'guest', label: 'Guest details' },
@@ -127,7 +134,32 @@ export default function ReservationPage({ params }) {
         <ActionDialog dialog={dialog} res={res} folio={dialog.folio ?? folio} property={property}
           onClose={() => setDialog(null)} onDone={done} />
       )}
+      {reinstate && <ReinstateDialog stay={reinstate} bd={bd} onClose={() => setReinstate(null)} onDone={() => { setReinstate(null); reload(); refresh(); }} />}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ Reinstate a no-show or cancelled booking
+function ReinstateDialog({ stay, bd, onClose, onDone }) {
+  const [run, busy] = useAction();
+  const [reason, setReason] = useState('');
+  const [waive, setWaive] = useState(false);
+  const late = stay.arrival < bd;
+  return (
+    <Modal title={stay.status === 'no_show' ? 'Reinstate a no-show' : 'Reinstate a cancelled booking'} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>Cancel</button>
+      <button className="btn btn-primary" disabled={busy || !reason.trim()} onClick={() => run(() => rpc('pms_reinstate_stay', { p_stay: stay.id, p_reason: reason, p_waive_fee: waive }))
+        .then((r) => { window.alert(['The booking is confirmed again.', r.arrival_moved && `It now starts today (${fmtDate(r.arrival)}); the missed nights are not charged as room nights.`,
+          r.room_released && 'Its room was given to someone else meanwhile: assign a room before checking the guest in.', r.fees_voided && 'The no-show or cancellation fee was voided.'].filter(Boolean).join('\n')); onDone(); })
+        .catch(() => {})}>Reinstate</button>
+    </>}>
+      <p>The booking goes back to <strong>confirmed</strong> with the same guest, rate, folio and history. Then check the guest in as usual.</p>
+      {late && <p className="note warn">The arrival day ({fmtDate(stay.arrival)}) has passed, so the stay will start today ({fmtDate(bd)}) and end on {fmtDate(stay.departure)} as booked.</p>}
+      <Field label="Why is it being reinstated?" hint="e.g. Flight delayed, guest arrived at 2 am; marked no-show by mistake">
+        <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <label className="check"><input type="checkbox" checked={waive} onChange={(e) => setWaive(e.target.checked)} /> Waive the no-show or cancellation fee already posted (it is voided with this reason)</label>
+    </Modal>
   );
 }
 
@@ -722,7 +754,7 @@ function MessageList({ res }) {
 // ------------------------------------------------------------------ Audit trail
 const ACTIONS = {
   'reservation.create': 'Reservation created', 'stay.check_in': 'Checked in', 'stay.check_out': 'Checked out',
-  'stay.assign_room': 'Room assigned', 'stay.amend': 'Stay amended', 'stay.cancel': 'Cancelled', 'stay.no_show': 'Marked no-show',
+  'stay.assign_room': 'Room assigned', 'stay.amend': 'Stay amended', 'stay.cancel': 'Cancelled', 'stay.no_show': 'Marked no-show', 'stay.reinstate': 'Reinstated',
   'folio.charge': 'Charge posted', 'folio.payment': 'Payment received', 'folio.refund': 'Refund paid', 'folio.discount': 'Discount given',
   'folio.void': 'Line voided', 'folio.transfer': 'Line moved',
 };

@@ -1,53 +1,41 @@
-﻿# Supabase CLI settings for the Edge Functions.
+# Supabase CLI settings for the Edge Functions.
 # Webhooks from Channex and the camera relay cannot send a Supabase JWT; they are
-# protected by their own shared secrets instead (see README â†’ Integrations).
+# protected by their own shared secrets instead (see README → Integrations).
 [functions.channex-webhook]
-entrypoint = "./functions/channex-webhook/index.js"
 verify_jwt = false
 
 [functions.hikvision-ingest]
-entrypoint = "./functions/hikvision-ingest/index.js"
 verify_jwt = false
 
 [functions.channex-sync]
-entrypoint = "./functions/channex-sync/index.js"
 verify_jwt = false
 
 [functions.ttlock-sync]
-entrypoint = "./functions/ttlock-sync/index.js"
 verify_jwt = false
 
 [functions.fiscal-sync]
-entrypoint = "./functions/fiscal-sync/index.js"
 verify_jwt = false
 
 [functions.pos-gateway]
-entrypoint = "./functions/pos-gateway/index.js"
 verify_jwt = false
 
 [functions.payments-sync]
-entrypoint = "./functions/payments-sync/index.js"
 verify_jwt = false
 
 [functions.clickpesa-webhook]
-entrypoint = "./functions/clickpesa-webhook/index.js"
 verify_jwt = false
 
 [functions.sms-sync]
-entrypoint = "./functions/sms-sync/index.js"
+verify_jwt = false
+
+[functions.email-sync]
 verify_jwt = false
 
 # integration-catalog keeps the Supabase JWT check: only signed-in staff reach it
 
 [functions.quickbooks-sync]
-entrypoint = "./functions/quickbooks-sync/index.js"
 verify_jwt = false
 
 # QuickBooks sends the browser back here without a Supabase session; the one-time state proves who started it
 [functions.quickbooks-oauth]
-entrypoint = "./functions/quickbooks-oauth/index.js"
 verify_jwt = false
-
-[functions.integration-catalog]
-entrypoint = "./functions/integration-catalog/index.js"
-

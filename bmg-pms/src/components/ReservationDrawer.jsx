@@ -7,6 +7,7 @@ import { can, fmtDate, guestName, money, nightsBetween } from '../lib/format';
 import { Badge, Drawer, Loading, Menu, useAction } from './ui.jsx';
 import ActionDialog from './ActionDialog.jsx';
 import Icon from './icons.jsx';
+import { ReservationPortal } from './GuestRequests.jsx';
 import { printFolio } from './print.js';
 import { confirmationText, mailLink, waLink } from './share.js';
 
@@ -80,10 +81,11 @@ export default function ReservationDrawer({ reservationId, onClose }) {
           <Menu label="Print / send" align="right" items={[
             openFolio && { label: 'Print folio', onClick: () => printFolio({ property, res, folio: openFolio }) },
             g.email && { label: 'Email confirmation', onClick: () => window.open(mailLink(g.email, `Reservation #${res.res_no} — ${property.name}`, msg)) },
-            g.phone && { label: 'Send on WhatsApp', onClick: () => window.open(waLink(g.phone, msg), '_blank') },
+            g.phone && { label: 'Send on WhatsApp', onClick: () => window.open(waLink(g.phone, msg), '_blank', 'noopener') },
           ]} />
         </div>
       </header>
+      <ReservationPortal stays={res.pms_stays} />
 
       <dl className="qv-grid">
         <div><dt>Reservation number</dt><dd>{res.res_no}</dd></div>

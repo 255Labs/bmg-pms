@@ -39,7 +39,7 @@ await db.exec(`insert into pms_platform_admins(user_id) values ('${ADMIN}')`);
 
 console.log('The price list');
 ok('every module and integration has an entry', Number(await val(`select count(*) from pms_catalog`)) >= 20);
-ok('a new hotel starts with every add-on on', Number(await val(`select count(*) from pms_property_addons where property_id=$1 and enabled`, [A])) === Number(await val(`select count(*) from pms_catalog`)));
+ok('a new hotel starts with every add-on that is sold switched on', Number(await val(`select count(*) from pms_property_addons a join pms_catalog c on c.key=a.key where a.property_id=$1 and a.enabled`, [A])) === Number(await val(`select count(*) from pms_catalog where active`)));
 await as(OWNER);
 ok('an owner cannot change prices', (await err(`select pms_admin_save_catalog('pos','{"monthly_price":1}'::jsonb)`)).includes('administrator'));
 ok('…or their own package', (await err(`select pms_admin_set_addon($1,'pos','{"monthly_price_override":"0"}'::jsonb)`, [A])).includes('administrator'));
@@ -104,6 +104,35 @@ ok('the owner sees their package and prices, and what else could be added', mine
   && mine.find((m) => m.key === 'procurement').enabled === false);
 await as(OWNER2);
 ok('an owner cannot see another hotel\'s package', (await err(`select * from pms_my_package($1)`, [A])).includes('owners'));
+
+console.log('Full package or feature by feature');
+await as(OWNER);
+const q1 = await val(`select pms_package_quote($1)`, [A]);
+ok('the owner sees each feature with its price and the à la carte total', q1.items.find((i) => i.key === 'pos').monthly == 90000 && Number(q1.a_la_carte_addons) === 90000 + 60000 && q1.full_package === false, JSON.stringify(q1).slice(0, 300));
+ok('guest mobile money is no longer sold', !q1.items.some((i) => i.key === 'clickpesa'));
+await as(ADMIN);
+const FULL = await val(`select id from pms_plans where name='Full package'`);
+await db.query(`select pms_admin_save_plan($1::jsonb)`, [J({ id: FULL, name: 'Full package', base_monthly: 450000, per_room: 0, per_user: 0, vat_pct: 18, active: true, all_addons: true })]);
+const qa = await val(`select pms_admin_package_quote($1)`, [A]);
+ok('the quote compares with the Full package price', qa.full_package_options.some((o) => Number(o.monthly) === 450000));
+await db.query(`select pms_admin_set_addon($1,'procurement','{"enabled":false}'::jsonb)`, [A]);
+await db.query(`select pms_admin_set_subscription($1,$2::jsonb)`, [A, J({ plan_id: FULL })]);
+ok('moving to the Full package switches every module and integration on', Number(await val(`select count(*) from pms_property_addons a join pms_catalog c on c.key=a.key where a.property_id=$1 and c.active and not c.included and not a.enabled`, [A])) === 0
+  && (await val(`select features from pms_properties where id=$1`, [A])).procurement !== false);
+await as(null);
+await db.query(`update pms_sub_invoices set status='void', void_reason='test' where property_id=$1`, [A]);
+const INV2 = await val(`select pms__issue_invoice($1,'2026-11-01')`, [A]);
+const inv2 = (await q(`select * from pms_sub_invoices where id=$1`, [INV2]))[0];
+ok('the invoice has one package line and no add-on lines', inv2.lines.length === 1 && inv2.lines[0].label.startsWith('Full package') && Number(inv2.subtotal) === 450000, JSON.stringify(inv2.lines));
+await as(OWNER);
+const q2 = await val(`select pms_package_quote($1)`, [A]);
+ok('the owner sees they are on the Full package, with everything included', q2.full_package === true && Number(q2.total_monthly) === 450000 && Number(q2.addons_monthly) === 0);
+await as(ADMIN);
+await db.query(`select pms_admin_set_subscription($1,$2::jsonb)`, [A, J({ plan_id: plan.id })]);
+await as(OWNER);
+ok('back on the standard plan, add-ons are priced one by one again', Number((await val(`select pms_package_quote($1)`, [A])).addons_monthly) > 0);
+await as(OWNER);
+ok('an owner cannot change plans', (await err(`select pms_admin_save_plan($1::jsonb)`, [J({ name: 'Mine', all_addons: true })])).includes('administrator'));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

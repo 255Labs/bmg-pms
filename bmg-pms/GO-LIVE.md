@@ -69,14 +69,14 @@ From the project folder:
 DATABASE_URL='postgresql://postgres.<ref>:<password>@<host>:5432/postgres' bash scripts/db-push.sh
 ```
 
-All twenty-six migrations run in one transaction: either everything lands or nothing does. The files are safe to
-re-run, so the same command is also how you upgrade later. (Without psql: run each file in
+All thirty-one migrations run in one transaction: either everything lands or nothing does. The files are safe to
+re-run, so the same command is also how you upgrade later. On Windows use `scripts\db-push.ps1` the same way. (Without psql: run each file in
 `supabase/migrations/` in order in the SQL Editor.)
 
 Check in the SQL Editor:
 
 ```sql
-select count(*) from pms_privilege_catalog;   -- 82
+select count(*) from pms_privilege_catalog;   -- 86
 select name, base_monthly, per_room, vat_pct, trial_days from pms_plans;   -- Standard
 ```
 
@@ -148,25 +148,24 @@ Or one at a time in Supabase → **Edge Functions → Secrets**. Make
 
 | Group | Secrets | Needed for |
 |---|---|---|
-| Always | `CRON_SECRET`, `APP_ORIGINS=https://pms.bmggroup.co.tz` | Schedules; browser calls |
-| BMG subscriptions | `CLICKPESA_CLIENT_ID_PLATFORM`, `CLICKPESA_API_KEY_PLATFORM` (+ `CLICKPESA_CHECKSUM_KEY_PLATFORM` if checksums are on in that account) | Owners paying BMG by phone |
-| Guest mobile money | `CLICKPESA_CLIENT_ID`, `CLICKPESA_API_KEY`, `CLICKPESA_WEBHOOK_TOKEN` (+ `CLICKPESA_CHECKSUM_KEY`) | Desk and booking-page payments |
-| SMS | `BEEM_API_KEY`, `BEEM_SECRET_KEY` | Door codes and guest texts |
+| Always | `CRON_SECRET`, `APP_ORIGINS=https://pms.bmggroup.co.tz` (https://, no slash at the end) | Schedules; browser calls |
+| BMG subscriptions | `CLICKPESA_CLIENT_ID_PLATFORM`, `CLICKPESA_API_KEY_PLATFORM`, `CLICKPESA_WEBHOOK_TOKEN` (+ `CLICKPESA_CHECKSUM_KEY_PLATFORM` if checksums are on in that account) | Owners paying BMG by phone. Guest mobile money is switched off for now, so this is the only ClickPesa account |
+| SMS | `BEEM_API_KEY`, `BEEM_SECRET_KEY` | Door codes, guest texts, guest portal links and keys |
+| Email | `RESEND_API_KEY`, `EMAIL_FROM=BMG Hotels <stay@bmggroup.co.tz>` (domain verified in Resend) | Guest portal links and keys by email |
 | Channex | `CHANNEX_API_KEY`, `CHANNEX_BASE_URL=https://app.channex.io/api/v1`, `CHANNEX_WEBHOOK_TOKEN` | OTAs |
 | TTLock | `TTLOCK_CLIENT_ID`, `TTLOCK_CLIENT_SECRET`, `TTLOCK_USERNAME`, `TTLOCK_PASSWORD` | Door codes |
 | Fiscal | `VFD_API_KEY`, `VFD_ALLOWED_HOSTS` | TRA receipts |
 | QuickBooks Online | `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI=https://<ref>.supabase.co/functions/v1/quickbooks-oauth`, `QBO_ENVIRONMENT=production` (or `sandbox`) | Sending suppliers, bills, payments and the daily journal |
 
-While testing ClickPesa, also set `CLICKPESA_BASE_URL=https://api-sandbox.clickpesa.com` (and
-`CLICKPESA_BASE_URL_PLATFORM` for BMG's account). Remove them to go live. A hotel with its own account for a
-provider gets the property code as a suffix, e.g. `CLICKPESA_API_KEY_UH`.
+While testing ClickPesa, also set `CLICKPESA_BASE_URL_PLATFORM=https://api-sandbox.clickpesa.com`. Remove it to
+go live. A hotel with its own account for a provider gets the property code as a suffix, e.g. `BEEM_API_KEY_UH`.
 
 ## 8. Turn on the schedules
 
 Open `supabase/schedules.sql`, replace the project URL and the cron secret (the same value as `CRON_SECRET`),
 and run the whole file once in the SQL Editor. It schedules:
 
-- payments (guests and BMG subscriptions), fiscal receipts and SMS every minute; Channex every 2 minutes;
+- BMG subscription payments, fiscal receipts, SMS and email every minute; Channex every 2 minutes;
   TTLock and QuickBooks every 5;
 - the BMG billing run every hour inside the database (invoices, overdue, locks), so billing keeps going even if
   the functions are down;
@@ -178,7 +177,7 @@ Check after a few minutes: `select jobname, status, start_time from cron.job_run
 
 ## 9. ClickPesa webhooks
 
-In **each** ClickPesa account (BMG's and any hotel's), set the payment webhook to:
+In BMG's ClickPesa account, set the payment webhook to:
 
 ```
 https://<ref>.supabase.co/functions/v1/clickpesa-webhook?token=<CLICKPESA_WEBHOOK_TOKEN>
@@ -186,7 +185,7 @@ https://<ref>.supabase.co/functions/v1/clickpesa-webhook?token=<CLICKPESA_WEBHOO
 
 The webhook only speeds things up: every payment is confirmed by asking ClickPesa directly, and the
 minute-by-minute check catches anything the webhook misses. Subscription payments are recognised by their
-`SUB…` reference and go to the subscription; guest payments (`BMG…`) go to the folio.
+`SUB…` reference and go to the subscription.
 
 ## 10. Set up billing (what properties pay BMG)
 
@@ -215,6 +214,11 @@ Control panel → **Billing**:
    bills without Activities POS). **Price** sets an agreed price for that hotel or free months ("Free until"),
    with a note. Everything ticked is listed on the next monthly invoice; owners see it under Setup → BMG PMS
    subscription → Your package.
+8. **Full package** (one price for everything): click the **Full package** plan, set its monthly price (and per
+   room or per staff if you like), tick **Active**. On any hotel's **Package**, the box at the top shows what it pays
+   now feature by feature and what the Full package would cost; **Move to Full package** switches every feature on
+   and the invoice becomes one line. **Pay feature by feature** moves it back. Owners see the same comparison
+   but only you can change it.
 
 ## 11. Open the properties
 
@@ -229,6 +233,15 @@ Then, signed in to the property (Setup):
 4. Team → Roles (e.g. Front Office Associate) → People and access: invite staff with a role.
 5. Team → Security rules: require two-step sign-in for everyone at the property.
 6. Talking to guests → Online booking: switch on and share the link `https://pms.bmggroup.co.tz/#/book/<code>`.
+7. Talking to guests → **Guest portal** (once BMG has added it to the package): switch on, choose text and/or
+   email, the room-service menu and the services offered, and save (saving also records the app's address for the
+   links). From then on every check-in sends the guest their link. On a reservation, **Send on WhatsApp** opens
+   WhatsApp with the message ready; **Key for the guest** gives a key to read out in person; **Stop link** ends it.
+   Requests pop up for staff (bell at the top right, Stay view, the reservation and Front office → Guest requests).
+   Fill in the welcome letter, Wi-Fi, hotel guide, offers and documents on the same page. BMG sets the portal's look
+   (theme, colours, slideshow photos) under Control panel → Content and portal look.
+8. Team → Roles: make a **Housekeeping Manager** role (base: Housekeeping; add "Put rooms under maintenance" and
+   "Room checks") and give it to the head of housekeeping. They work from Housekeeping → **Housekeeping board**.
 
 **Import from eZee** (Administration → Import from eZee): export guests, future bookings and in-house guests from eZee as
 CSV and import them. Re-running a file never duplicates.
@@ -236,8 +249,8 @@ CSV and import them. Re-running a file never duplicates.
 ## 12. Integrations, per property (when each is ready)
 
 Administration → **Integrations**, one at a time:
-- **Mobile money**: switch on; test with a small amount on a test folio.
-- **SMS**: switch on once Beem approves the sender name; edit the messages.
+- **SMS**: switch on once Beem approves the sender name; edit the messages. Guest portal links and keys go by text
+  only when SMS is on.
 - **Channex**: Load from Channex → map room types and rate plans; paste the webhook URL into Channex. Test on
   Channex staging first.
 - **TTLock**: Load locks → map rooms. Check one real door with a guest code.
@@ -352,7 +365,7 @@ From here on, nobody deploys by hand. Follow `scripts/README-deploy.md` once (ab
 2. GitHub Environments `staging`, `production` (with required approvers) and `preview`, each with its values.
 3. Branch protection on `main`: pull requests only, Code Owner review, `checks` and `tests` must pass.
 
-Then: every pull request is linted, checked module by module, tested (21 suites) and tried in a browser, and gets
+Then: every pull request is linted, checked module by module, tested (23 suites) and tried in a browser, and gets
 its own preview site. Merging to `main` deploys to staging automatically, then to production after approval, with
 the isolation report and a smoke test after each. Releases are tagged; rolling back the app is one click.
 If a property ever needs its own database, it becomes one more production target (same code, separate data).
@@ -371,6 +384,8 @@ If a property ever needs its own database, it becomes one more production target
 - [ ] `service_role` key is not in Netlify, GitHub or any device; only Supabase has it.
 - [ ] `APP_ORIGINS` is the live address; all `*_TOKEN` values are long and random.
 - [ ] Sandbox `*_BASE_URL` secrets removed.
+- [ ] `CRON_SECRET` made fresh if it was ever pasted into chats or messages (and the same value in `schedules.sql`).
+- [ ] Resend domain verified; a guest portal key arrives by email and by text.
 - [ ] SMTP works: invite a test address, reset a password.
 - [ ] A front-desk test account cannot open Setup, Reports it is not given, or another property.
 - [ ] Camera passwords: a separate `pms-relay` user on each camera and NVR; `admin` passwords changed if they were
@@ -379,8 +394,9 @@ If a property ever needs its own database, it becomes one more production target
 ## 16. Test day (one property, before real guests)
 
 Walk through a full day on a test property, or the real one before opening: make a booking, check in
-(dirty-room warning), move the room (the charge question appears), post a POS bill to the room, take a mobile
-money payment, check out, close the drawer, run the night audit (dark screen from the audit window until it
+(dirty-room warning), move the room (the charge question appears), post a POS bill to the room, open the guest portal link on a phone, order a
+dish and accept it (it reaches the kitchen display and the folio), take a payment, check out (the portal link
+stops), close the drawer, run the night audit (dark screen from the audit window until it
 runs), print a folio, run the daily revenue report. Then pay a test subscription invoice (step 10.5).
 
 ## 17. Switch over from eZee

@@ -50,7 +50,7 @@
  "table pms_fiscal_receipts": "6200904f643e",
  "table pms_import_runs": "22570b8d3978",
  "table pms_integration_log": "441db97ac4ec",
- "table pms_jobs": "3e68f5ac00d0",
+ "table pms_jobs": "bd4b4542e4f4",
  "table pms_rate_restrictions": "0ad17b0096ad",
  "table pms_stay_passcodes": "c877467f69ec"
 }

@@ -737,7 +737,7 @@ function ZReport({ z, onClose }) {
   );
 }
 
-function MenuSetup() {
+export function MenuSetup() {
   const { property } = useProperty();
   const [outlets, setOutlets] = useState([]);
   const [items, setItems] = useState([]);

@@ -42,7 +42,7 @@ export default function ControlBilling() {
 
       <h3>Plans</h3>
       <Table rows={plans} onRow={setPlan} empty="No plans yet." columns={[
-        { key: 'name', label: 'Plan', render: (p) => <><strong>{p.name}</strong>{p.is_default && <Badge kind="blue">Default for new properties</Badge>}{!p.active && <Badge kind="grey">Retired</Badge>}</> },
+        { key: 'name', label: 'Plan', render: (p) => <><strong>{p.name}</strong>{p.all_addons && <Badge kind="teal">Full package</Badge>}{p.is_default && <Badge kind="blue">Default for new properties</Badge>}{!p.active && <Badge kind="grey">Retired</Badge>}</> },
         { key: 'base_monthly', label: 'Monthly fee', num: true, render: (p) => money(p.base_monthly, p.currency) },
         { key: 'per_room', label: 'Per room', num: true, render: (p) => money(p.per_room, p.currency) },
         { key: 'per_user', label: 'Per staff', num: true, render: (p) => money(p.per_user, p.currency) },
@@ -78,6 +78,7 @@ function PlanEditor({ plan, onClose, onSaved }) {
         <Field label="Free trial days" hint="For new properties on this plan"><input type="number" min="0" max="365" value={f.trial_days} onChange={set('trial_days')} /></Field>
         <Field label="Description" span={2}><input value={f.description ?? ''} onChange={set('description')} /></Field>
       </div>
+      <label className="check"><input type="checkbox" checked={!!f.all_addons} onChange={set('all_addons')} /> Full package: every module and integration included for this one price (no add-on charges; hotels moved to it get everything switched on)</label>
       <label className="check"><input type="checkbox" checked={!!f.is_default} onChange={set('is_default')} /> Default plan for new properties</label>
       <label className="check"><input type="checkbox" checked={f.active !== false} onChange={set('active')} /> Available (untick to retire; properties already on it keep it)</label>
     </Modal>
@@ -121,7 +122,7 @@ function SubscriptionDrawer({ row, plans, onClose, onChanged }) {
           : <button className="btn" disabled={busy} onClick={() => save({ cancelled: false }, 'Billing restarted')}>Restart billing</button>}
       </div>
 
-      <PackageEditor propertyId={row.property_id} onChanged={onChanged} />
+      <PackageEditor propertyId={row.property_id} plans={plans} onChanged={() => { onChanged(); }} />
 
       <h3>Invoices</h3>
       {!invoices ? <Loading /> : !invoices.length ? <p className="muted small">No invoices yet.</p> : (
@@ -233,17 +234,25 @@ function CatalogEditor({ item, onClose, onSaved }) {
 }
 
 // ---------------------------------------------------------------- one hotel's package
-function PackageEditor({ propertyId, onChanged }) {
+function PackageEditor({ propertyId, plans, onChanged }) {
   const [run, busy] = useAction();
   const [rows, setRows] = useState(null);
+  const [quote, setQuote] = useState(null);
   const [edit, setEdit] = useState(null);
-  const load = useCallback(() => rpc('pms_admin_property_addons', { p_property: propertyId }).then(setRows).catch(() => setRows([])), [propertyId]);
+  const load = useCallback(() => Promise.all([
+    rpc('pms_admin_property_addons', { p_property: propertyId }).then(setRows).catch(() => setRows([])),
+    rpc('pms_admin_package_quote', { p_property: propertyId }).then(setQuote).catch(() => setQuote(null)),
+  ]), [propertyId]);
   useEffect(() => { load(); }, [load]);
   const set = (key, p, msg) => run(() => rpc('pms_admin_set_addon', { p_property: propertyId, p_key: key, p }), msg).then(() => { load(); onChanged(); }).catch(() => {});
   if (!rows) return <Loading />;
+  const standard = plans.find((x) => x.is_default && !x.all_addons) ?? plans.find((x) => x.active && !x.all_addons);
+  const movePlan = (planId, msg) => run(() => rpc('pms_admin_set_subscription', { p_property: propertyId, p: { plan_id: planId } }), msg).then(() => { load(); onChanged(); }).catch(() => {});
   return (
     <>
-      <h3>Package <span className="small muted">· add-ons {money(rows.reduce((n, r) => n + Number(r.monthly_now), 0))} a month before VAT</span></h3>
+      <h3>Package</h3>
+      {quote && <PackageSummary q={quote} admin onFull={(o) => movePlan(o.plan_id, `Moved to ${o.plan}`)} onALaCarte={standard && quote.full_package ? () => movePlan(standard.id, `Back to ${standard.name}, feature by feature`) : null} busy={busy} />}
+      {quote?.full_package && <p className="small muted">On the Full package every feature below is included; ticks and prices here apply again if the hotel goes back to paying feature by feature.</p>}
       <div className="pkg-list">
         {rows.map((r) => (
           <div key={r.key} className={`pkg-row ${r.enabled ? 'on' : ''}`}>
@@ -277,5 +286,32 @@ function PackageEditor({ propertyId, onChanged }) {
         </Modal>
       )}
     </>
+  );
+}
+
+// What a hotel pays: plan and features one by one, the total, and the Full package beside it
+export function PackageSummary({ q, admin, onFull, onALaCarte, busy }) {
+  const cheaper = (q.full_package_options ?? []).filter((o) => Number(o.monthly) > 0);
+  return (
+    <div className="pkg-summary">
+      <div className="pkg-total">
+        <span className="small muted">{q.full_package ? 'Full package' : q.agreed_price != null ? 'Agreed price' : `${q.plan ?? 'No plan'}, feature by feature`}</span>
+        <strong>{money(q.total_monthly)}<small> a month before VAT</small></strong>
+        {!q.full_package && <span className="small">Plan {money(q.plan_monthly)} ({q.rooms} rooms, {q.staff} staff) + features {money(q.addons_monthly)}</span>}
+        {q.full_package && <span className="small">Every module and integration included</span>}
+      </div>
+      {!q.full_package && cheaper.map((o) => {
+        const diff = Number(o.monthly) - Number(q.total_monthly);
+        return (
+          <div key={o.plan_id} className="pkg-compare">
+            <span className="small muted">{o.plan}: everything included</span>
+            <strong>{money(o.monthly)}</strong>
+            <span className={`small ${diff < 0 ? 'good' : 'muted'}`}>{diff < 0 ? `Saves ${money(-diff)} a month` : `${money(diff)} more a month, for every feature`}</span>
+            {admin && onFull && <button className="btn btn-small" disabled={busy} onClick={() => window.confirm(`Move this hotel to ${o.plan} at ${money(o.monthly)} a month? Every module and integration is switched on.`) && onFull(o)}>Move to {o.plan}</button>}
+          </div>
+        );
+      })}
+      {q.full_package && admin && onALaCarte && <div className="pkg-compare"><span className="small muted">Feature by feature instead</span><strong>{money(q.a_la_carte_addons)}<small> in features + a plan fee</small></strong><button className="btn btn-small" disabled={busy} onClick={onALaCarte}>Pay feature by feature</button></div>}
+    </div>
   );
 }

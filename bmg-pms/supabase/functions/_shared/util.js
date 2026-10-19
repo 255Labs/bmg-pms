@@ -73,3 +73,19 @@ export function sameSecret(a, b) {
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 }
+
+// APP_ORIGINS → clean origins. Forgives common slips ("http://https://site/", a trailing slash) and drops anything
+// that is not https (plain http only for localhost), so a bad value can never open the door wider.
+export function parseOrigins(raw) {
+  return String(raw ?? '').split(',')
+    .map((s) => s.trim().replace(/^https?:\/\/(?=https?:\/\/)/i, '').replace(/\/+$/, '').toLowerCase())
+    .filter((s) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/.test(s) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(s));
+}
+
+// CORS for browser calls: only the app's own origins are allowed. Nothing set → nobody (never "*").
+export function corsFor(origins, origin, methods = 'POST, OPTIONS') {
+  return {
+    'access-control-allow-origin': origins.includes(String(origin ?? '').toLowerCase()) ? origin : (origins[0] ?? 'null'), vary: 'origin',
+    'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type', 'access-control-allow-methods': methods,
+  };
+}

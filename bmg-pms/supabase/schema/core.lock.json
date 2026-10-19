@@ -211,8 +211,8 @@
  "table pms_rates": "7fc70a4b7c8d",
  "table pms_reservations": "e20d7da2bb14",
  "table pms_room_types": "b0c64b181ee4",
- "table pms_rooms": "0e09e8712764",
- "table pms_stays": "b76a320949b7",
- "table pms_work_orders": "626e1d0ba6f4",
+ "table pms_rooms": "14cb49919d0f",
+ "table pms_stays": "cbc2b07cc4d9",
+ "table pms_work_orders": "def9245d6d3d",
  "view pms_folio_balances": "d5eb80eb4313"
 }

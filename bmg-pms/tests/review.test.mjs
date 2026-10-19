@@ -137,5 +137,41 @@ const c5 = await one(`select departure::text d, rate from pms_stays where id=$1`
 ok('amend with the chosen rate and a reason', c5.d === '2026-10-15' && Number(c5.rate) === 250000);
 ok('the reason is logged', Number(await val(`select count(*) from pms_audit_log where action='stay.amend_reason' and entity_id=$1`, [S5])) === 1);
 
+console.log('\nReinstating a no-show or cancelled booking');
+await as(OWNER);
+await db.exec(`update pms_properties set business_date='2026-11-01' where id='${P}'`);
+const rn = await book('332', 'Nadia', '2026-11-01', '2026-11-04');
+const SN = await stayOf(rn);
+const rc = await book('335', 'Omar', '2026-11-03', '2026-11-05');
+const SC = await stayOf(rc);
+const old = await book('340', 'Quinn', '2026-11-03', '2026-11-04');
+const SO = await stayOf(old);
+await db.exec(`update pms_properties set business_date='2026-11-02' where id='${P}'`);
+await db.query(`update pms_stays set status='no_show' where id=$1`, [SN]);   // as the night audit of 1 Nov would
+await db.query(`select pms__refresh_reservation($1)`, [rn.reservation_id]);
+const nf = await val(`select id from pms_folios where stay_id=$1`, [SN]);
+await db.query(`select pms_post_room_charge($1,'no_show',200000,'No-show 1 Nov')`, [nf]);
+await as(DESK);
+ok('the front desk cannot reinstate', (await err(`select pms_reinstate_stay($1,'Guest arrived')`, [SN])).length > 0);
+await as(MGR);
+ok('a reason is required', (await err(`select pms_reinstate_stay($1,'')`, [SN])).includes('Say why'));
+const back = await val(`select pms_reinstate_stay($1,'Flight delayed, guest arrived today',true)`, [SN]);
+const sn = await one(`select status, arrival::text a, departure::text d, room_id from pms_stays where id=$1`, [SN]);
+ok('the no-show is confirmed again, starting today (the missed night is not stayed)', sn.status === 'confirmed' && sn.a === '2026-11-02' && sn.d === '2026-11-04' && back.arrival_moved === true);
+ok('it keeps its room', sn.room_id === await room('332') && back.room_released === false);
+ok('the no-show fee was waived (voided with the reason)', Number(await val(`select count(*) from pms_folio_lines where stay_id=$1 and sub_type='no_show' and voided and void_reason like 'Fee waived%'`, [SN])) === 1 && back.fees_voided === 1);
+ok('the reservation shows as confirmed again', (await val(`select status from pms_reservations where id=$1`, [rn.reservation_id])) === 'confirmed');
+ok('it is in the audit trail with the reason', Number(await val(`select count(*) from pms_audit_log where action='stay.reinstate' and entity_id=$1`, [SN])) === 1);
+await as(OWNER);
+await db.query(`select pms_cancel_stay($1,'Changed plans')`, [SC]);
+await book('335', 'Paul', '2026-11-03', '2026-11-05');   // the room is sold again
+const back2 = await val(`select pms_reinstate_stay($1,'Cancelled by mistake')`, [SC]);
+ok('a cancelled booking whose room was resold comes back without a room, for the desk to assign', back2.room_released === true
+  && (await val(`select room_id from pms_stays where id=$1`, [SC])) === null && (await val(`select status from pms_stays where id=$1`, [SC])) === 'confirmed');
+await db.query(`select pms_cancel_stay($1,'x')`, [SO]);
+await db.exec(`update pms_properties set business_date='2026-11-05' where id='${P}'`);
+ok('a booking whose dates are over cannot be reinstated', (await err(`select pms_reinstate_stay($1,'Too late')`, [SO])).includes('dates are over'));
+ok('a live booking cannot be reinstated', (await err(`select pms_reinstate_stay($1,'x')`, [SC])).includes('Only a no-show'));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

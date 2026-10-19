@@ -23,6 +23,8 @@ await db.exec(`
   create table auth.users (id uuid primary key, email text unique, created_at timestamptz default now(), last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;`);
 for (const f of readdirSync(join(root, 'supabase/migrations')).sort()) await db.exec(readFileSync(join(root, 'supabase/migrations', f), 'utf8'));
+// guest mobile money is switched off in the product for now (migration 28); these checks keep the dormant code working
+await db.exec(`update pms_catalog set active = true, default_on = true where key = 'clickpesa'`);
 
 const OWNER = '11111111-1111-1111-1111-111111111111', DESK = '22222222-2222-2222-2222-222222222222', MGR = '33333333-3333-3333-3333-333333333333';
 await db.exec(`insert into auth.users(id,email) values ('${OWNER}','owner@uh.co.tz'),('${DESK}','desk@uh.co.tz'),('${MGR}','mgr@uh.co.tz')`);

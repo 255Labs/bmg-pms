@@ -5,8 +5,8 @@ import os, json, sys
 from playwright.sync_api import sync_playwright
 U = 'http://localhost:54321/'
 OUT = os.path.join(os.path.dirname(__file__), 'audit'); os.makedirs(OUT, exist_ok=True)
-ROUTES = 'today stay-view reservations front-desk guests cash-drawer pos kitchen procurement accounting city-ledger expenses stock rates agents exchange-rates packages messages lost-found house-status maintenance work-orders assets night-audit reports revenue-assurance integrations import setup group security'.split()
-SETUP = 'profile showcase policies formats rooms plans taxes payments extras discounts payouts meals transport sources segments booktypes tags holidays remarks messages documents website staff roles access signins activity security subscription'.split()
+ROUTES = 'today stay-view reservations front-desk guests cash-drawer pos kitchen procurement accounting city-ledger expenses stock rates agents exchange-rates packages messages lost-found house-status maintenance work-orders assets night-audit reports revenue-assurance integrations import setup group security guest-requests hk-board'.split()
+SETUP = 'profile showcase policies formats rooms plans taxes payments extras discounts payouts meals transport sources segments booktypes tags holidays remarks messages documents website staff roles access signins activity security subscription portal'.split()
 VIEWS = [(1440, 900), (1280, 720), (1024, 768), (390, 844)]
 only = sys.argv[1:] 
 JS = r'''() => {
@@ -29,6 +29,10 @@ JS = r'''() => {
     if (e.children.length === 0 && e.textContent.trim() && e.scrollWidth > e.clientWidth + 2 && s.overflowX === 'visible' && s.display !== 'inline' && !e.matches('input,select,textarea,option,svg *'))
       out.push({ k: 'spill', el: path(e), text: e.textContent.trim().slice(0, 40), sw: e.scrollWidth, cw: e.clientWidth });
   }
+  const bar = document.querySelector('.appbar');
+  if (bar && bar.scrollWidth > bar.clientWidth + 2) out.push({ k: 'appbar-overflow', sw: bar.scrollWidth, cw: bar.clientWidth });
+  const mn = document.querySelector('.mainnav');
+  if (mn && getComputedStyle(mn).display !== 'none' && mn.scrollWidth > mn.clientWidth + 2) out.push({ k: 'mainnav-overflow', sw: mn.scrollWidth, cw: mn.clientWidth });
   const foot = document.querySelector('.sidebar-foot');
   if (foot && getComputedStyle(document.querySelector('.sidebar')).transform === 'none') { const r = foot.getBoundingClientRect(); if (r.bottom > H + 1) out.push({ k: 'sidebar-foot-hidden', bottom: r.bottom }); }
   const nav = document.querySelector('.sidebar nav');
@@ -68,6 +72,9 @@ with sync_playwright() as p:
             pg.goto(U + '#/revenue-assurance'); pg.wait_for_selector('.tabs'); pg.click(f'.tabs button:has-text("{t}")'); check(pg, f'{w}-audit-{t.split()[0].lower()}', shot=(w in (1440, 390)))
         pg.click('.tabs button:has-text("Findings")'); pg.wait_for_selector('table tbody tr'); pg.wait_for_timeout(800)
         if pg.locator('table tbody tr').count(): pg.click('table tbody tr >> nth=0'); pg.wait_for_selector('.drawer'); pg.wait_for_timeout(700); check(pg, f'{w}-audit-finding', shot=(w in (1440, 390))); pg.keyboard.press('Escape')
+        pg.goto(U + '#/control-panel?tab=content'); pg.wait_for_timeout(900)
+        if pg.locator('.cp-content-pick select').count():
+            pg.select_option('.cp-content-pick select', index=1); pg.wait_for_selector('.plook', timeout=10000); check(pg, f'{w}-portal-look', shot=(w in (1440, 390)))
         pg.goto(U + '#/kitchen'); pg.wait_for_selector('.kds, .empty'); check(pg, f'{w}-kds', shot=(w in (1440, 390)))
         pg.goto(U + '#/accounting'); pg.wait_for_timeout(900); check(pg, f'{w}-qbo', shot=(w in (1440, 390)))
         pg.goto(U + '#/setup?tab=subscription'); pg.wait_for_selector('.pkg-list'); check(pg, f'{w}-my-package', shot=(w in (1440, 390)))
@@ -88,6 +95,18 @@ with sync_playwright() as p:
         pg.close()
         pb = b.new_page(viewport={'width': w, 'height': h}); pb.goto(U + '#/book/uh'); pb.wait_for_selector('.bk-search'); check(pb, f'{w}-book')
         pb.close()
+        # the guest portal: sign-in, then each tab with the demo session
+        import os
+        lp = os.path.join(os.path.dirname(__file__), '.portal-link'); sp = os.path.join(os.path.dirname(__file__), '.portal-session')
+        if os.path.exists(lp):
+            link = open(lp).read().strip(); sess = open(sp).read().strip(); tok = link.split('/stay/')[1]
+            gp = b.new_page(viewport={'width': w, 'height': h}); gp.goto(link); gp.wait_for_selector('.gp-form'); check(gp, f'{w}-portal-signin', shot=(w in (1440, 390)))
+            gp.evaluate("([k,v]) => localStorage.setItem(k,v)", ['bmg-stay-' + tok[:16], sess]); gp.reload(); gp.wait_for_selector('.gp-bottom')
+            gp.wait_for_selector('.gp-welcome'); check(gp, f'{w}-portal-welcome', shot=(w in (1440, 390)))
+            for t in ['Food', 'Services', 'Requests', 'Bill']:
+                if gp.locator(f'.gp-bottom button:has-text("{t}")').count():
+                    gp.click(f'.gp-bottom button:has-text("{t}")'); check(gp, f'{w}-portal-{t.lower()}', shot=(w in (1440, 390)))
+            gp.close()
         if errs: issues[f'{w}-pageerrors'] = errs
 from collections import defaultdict
 agg=defaultdict(list)

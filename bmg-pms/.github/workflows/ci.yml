@@ -1,6 +1,6 @@
 # CI: every push and pull request.
 #   checks  → lint, database module boundaries and lock files, dependency audit, secret scan, production build
-#   tests   → all 15 suites in parallel on an embedded Postgres
+#   tests   → all 23 suites in parallel on an embedded Postgres
 #   e2e     → the whole app on the local stack (real PostgREST) in a browser at 4 screen widths; only when screens changed
 # Deploys are in deploy.yml and start only after this workflow is green on main.
 name: CI
@@ -31,6 +31,8 @@ jobs:
         run: npm run lint
       - name: Database modules (boundaries, re-run safety, property isolation, lock files)
         run: npm run db:check
+      - name: Database structure report
+        run: npm run db:report
       - name: Dependencies with known high-severity problems
         run: npm audit --omit=dev --audit-level=high
       - name: No keys or passwords committed
@@ -54,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [db, mw, platform, payments, stock, admin, security, activities, operations, permissions, privileges, review, nightmode, billing, isolation, pos, procurement, quickbooks, packages, relay, audit]
+        suite: [db, mw, platform, payments, stock, admin, security, activities, operations, permissions, privileges, review, nightmode, billing, isolation, pos, procurement, quickbooks, packages, relay, audit, portal, housekeeping]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

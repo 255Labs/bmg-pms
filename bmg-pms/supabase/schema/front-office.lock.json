@@ -23,6 +23,8 @@
  "function pms_create_reservation(p_property uuid, p_guest jsonb, p_arrival date, p_departure date, p_rooms jsonb, p_source_id uuid, p_rate_plan_id uuid, p_company_id uuid, p_status text, p_notes text, p_external_ref text)": "22807f5994af",
  "function pms_drawer_expected(p_session uuid)": "3374c94d80b0",
  "function pms_free_rooms(p_property uuid, p_arrival date, p_departure date, p_exclude_stay uuid)": "783b783c4c74",
+ "function pms_hk_board(p_property uuid)": "919d12d18b5f",
+ "function pms_hk_set(p_room uuid, p_status text, p_note text)": "24ba51de0f41",
  "function pms_list_members(p_property uuid)": "55a80ad6e342",
  "function pms_move_room(p_stay uuid, p_room uuid, p_rate numeric, p_reason text)": "45b38b6884f8",
  "function pms_open_drawer(p_property uuid, p_float numeric)": "c144c815e78d",
@@ -30,10 +32,13 @@
  "function pms_post_discount(p_folio uuid, p_amount numeric, p_reason text)": "ca5505fcf174",
  "function pms_post_payment(p_folio uuid, p_amount numeric, p_method text, p_reference text, p_refund boolean)": "32b50984bd4e",
  "function pms_rate(p_room_type uuid, p_rate_plan uuid, p_date date)": "6cae2bedf362",
+ "function pms_reinstate_stay(p_stay uuid, p_reason text, p_waive_fee boolean)": "798b19de8be4",
  "function pms_release_block(p_block uuid)": "154b16be3167",
  "function pms_set_member(p_property uuid, p_email text, p_role text, p_display_name text, p_active boolean)": "c930ea323823",
  "function pms_set_room_status(p_room uuid, p_status text, p_note text)": "c39ae59e251e",
  "function pms_transfer_line(p_line uuid, p_to_folio uuid)": "ddeb110a3564",
+ "function pms_trg_room_status_log()": "72535ba05992",
  "function pms_type_availability(p_room_type uuid, p_date date)": "0c42a12832f7",
- "function pms_void_line(p_line uuid, p_reason text)": "b0862dd90fc5"
+ "function pms_void_line(p_line uuid, p_reason text)": "b0862dd90fc5",
+ "table pms_room_status_log": "7bc20591eb86"
 }

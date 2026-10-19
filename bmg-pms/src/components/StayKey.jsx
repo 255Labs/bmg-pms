@@ -12,6 +12,7 @@ const STAYS = [
   ['checked_out', '', 'Checked out', 'Left; folio may still be open'],
 ];
 const FLAGS = [
+  ['bell', 'Guest request', 'Asked for food or a service on the guest portal; the bar pulses while it is new'],
   ['coin', 'Money owed', 'Open balance on the folio'],
   ['star', 'VIP', 'Guest tagged VIP'],
   ['people', 'Group', 'More than one room on the booking'],

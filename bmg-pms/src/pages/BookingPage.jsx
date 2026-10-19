@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { rpc } from '../lib/supabase';
 import { Field } from '../components/ui.jsx';
+import { GUEST_PAYMENTS } from '../lib/modules.js';
 
 // The hotel's own public booking page: #/book/<property code>. No sign-in.
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -137,7 +138,7 @@ export default function BookingPage({ code }) {
               <Field label="Requests" span={2}><textarea rows={2} maxLength={500} value={g.requests} onChange={(e) => setG({ ...g, requests: e.target.value })} /></Field>
             </div>
             <p className="bk-total-line">Total {p.currency} {fmt(chosen.total * Number(g.rooms))}{p.tax_inclusive ? ' including tax' : ' plus tax'}</p>
-            {be.pay_now_mobile && p.currency === 'TZS' && <label className="check"><input type="checkbox" checked={g.pay_now} onChange={(e) => setG({ ...g, pay_now: e.target.checked })} /> Pay {Number(be.deposit_pct ?? 100) < 100 ? `a ${be.deposit_pct}% deposit` : 'now'} by M-Pesa, Tigo Pesa or Airtel Money (a request comes to your phone)</label>}
+            {GUEST_PAYMENTS && be.pay_now_mobile && p.currency === 'TZS' && <label className="check"><input type="checkbox" checked={g.pay_now} onChange={(e) => setG({ ...g, pay_now: e.target.checked })} /> Pay {Number(be.deposit_pct ?? 100) < 100 ? `a ${be.deposit_pct}% deposit` : 'now'} by M-Pesa, Tigo Pesa or Airtel Money (a request comes to your phone)</label>}
             {policies.length > 0 && (
               <details className="bk-policies"><summary>Hotel policies</summary>
                 {policies.map(([k, v]) => <div key={k}><h4>{POLICY_NAMES[k] ?? k}</h4><p>{v}</p></div>)}
@@ -157,7 +158,7 @@ export default function BookingPage({ code }) {
           </section>
         )}
       </>}
-      <footer className="bk-foot">Booking directly with {p.name}{p.website ? <> · <a href={p.website} rel="noreferrer">{p.website.replace(/^https?:\/\//, '')}</a></> : null}</footer>
+      <footer className="bk-foot">Booking directly with {p.name}{/^https?:\/\//i.test(p.website ?? '') ? <> · <a href={p.website} rel="noreferrer noopener" target="_blank">{p.website.replace(/^https?:\/\//, '')}</a></> : null}</footer>
     </div>
   );
 }
